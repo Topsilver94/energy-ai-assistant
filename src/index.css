@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 全局底色与文字（黑绿先锋：近黑底 + 白字三级，CLAUDE.md §6） */
+html {
+  color-scheme: dark;
+}
+body {
+  @apply bg-ink font-sans text-paper antialiased;
+}
+
+/* 数据数字统一等宽表格数字，避免流式更新时跳动 */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 滚动条融入暗色主题 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #333333 transparent;
+}
+
+/* 模块③ Markdown 方案排版（react-markdown 输出裸元素，统一暗色与打印适配） */
+.md {
+  @apply text-[15px] leading-relaxed text-paper;
+}
+.md h1 {
+  @apply mb-3 text-xl font-bold;
+}
+.md h2 {
+  @apply mb-2 mt-5 text-base font-bold;
+}
+.md p {
+  @apply my-2;
+}
+.md ul {
+  @apply my-2 list-disc space-y-1 pl-5 text-paper-mute;
+}
+.md ol {
+  @apply my-2 list-decimal space-y-1 pl-5 text-paper;
+}
+.md strong {
+  @apply font-semibold text-paper;
+}
+.md blockquote {
+  @apply my-2 border-l-2 border-volt/60 pl-3 text-[13px] text-paper-mute;
+}
+.md table {
+  @apply my-3 w-full border-collapse text-sm;
+}
+.md th {
+  @apply border border-line bg-ink-raised px-2 py-1.5 text-left font-semibold;
+}
+.md td {
+  @apply border border-line px-2 py-1.5 text-left text-paper-mute;
+}
+
+/* 打印适配：白底黑字、隐藏导航与参数面板（模块③ 方案页复用，CLAUDE.md §6） */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .md,
+  .md p,
+  .md ul,
+  .md ol,
+  .md td,
+  .md strong {
+    color: #000000 !important;
+  }
+  .md th {
+    background: transparent !important;
+    color: #000000 !important;
+  }
+  .md blockquote {
+    border-color: #999999 !important;
+    color: #333333 !important;
+  }
+}
