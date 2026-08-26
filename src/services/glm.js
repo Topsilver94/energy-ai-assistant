@@ -15,7 +15,9 @@ import { newBuildMeasures } from '../data/measures.js'
 
 const SYSTEM_PROMPT =
   '你是一位拥有 15 年经验的综合能源资深专家，擅长光伏、储能、供冷及节能改造项目的财务分析与技术落地。' +
-  '请用专业、客观、数据驱动的语气撰写报告，严禁虚构数据，所有结论必须基于用户提供的数值。输出格式为 Markdown。'
+  '请用专业、客观、数据驱动的语气撰写报告，严禁虚构数据，所有结论必须基于用户提供的数值。输出格式为 Markdown。' +
+  '全文使用简体中文行文，不夹带英文单词或英文短语（如需表述请用中文，如「尖峰负荷」而非 peak demand）；' +
+  '仅保留行业通用缩略语与计量单位，如 IRR、COP、kW/kWh/MW/MWh、tCO₂。'
 
 const fmt = (n, digits = 1) => Number(n).toFixed(digits)
 

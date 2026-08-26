@@ -72,6 +72,10 @@ export default function AIReportPanel({ wide = false }) {
     { label: 'Step 2 · 挖掘痛点', ok: isDiagnosisDone },
   ]
 
+  // 提示拼接：上游 message 常以句号结尾（如「…请充值。」），直接接「，已回退」会叠标点，
+  // 统一去尾再拼
+  const joinNotice = (msg, tail) => `${msg.replace(/[.。,，;；!！?？\s]+$/, '')}，${tail}`
+
   const handleGenerate = () => {
     // 取三个 store 的最新快照
     const p = useProjectStore.getState()
@@ -109,10 +113,10 @@ export default function AIReportPanel({ wide = false }) {
         if (type === 'aborted') {
           // 用户主动停止：已有部分内容则保留，否则降级到本地模板
           if (useAiStore.getState().reportContent) setGenerating(false)
-          else fallback(`${message}，已生成本地模板方案`)
+          else fallback(joinNotice(message, '已生成本地模板方案'))
           return
         }
-        fallback(`${message}，已自动回退本地模板方案`)
+        fallback(joinNotice(message, '已自动回退本地模板方案'))
       },
     })
   }

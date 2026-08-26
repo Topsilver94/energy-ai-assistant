@@ -70,7 +70,19 @@ export default function ApiSettingsModal({ open, onClose }) {
       window.clearTimeout(timer)
       if (res.ok) setTestResult({ ok: true, message: '连接成功，Key 有效' })
       else if (res.status === 401) setTestResult({ ok: false, message: 'Key 无效（401），请检查后重试' })
-      else setTestResult({ ok: false, message: `接口返回 ${res.status}，请检查地址与模型名` })
+      else {
+        // 解析错误体回显真实原因（如 429 余额不足），避免把用户引向「检查地址」的错误排查方向
+        let detail = ''
+        try {
+          detail = (await res.json())?.error?.message ?? ''
+        } catch {
+          /* 非 JSON 错误体，保持空 */
+        }
+        setTestResult({
+          ok: false,
+          message: `接口返回 ${res.status}${detail ? `：${detail}` : '，请检查地址与模型名'}`,
+        })
+      }
     } catch {
       setTestResult({ ok: false, message: '网络请求失败（可能为跨域限制或网络不通）' })
     } finally {
