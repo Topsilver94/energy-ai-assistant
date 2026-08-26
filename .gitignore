@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+.DS_Store
+.claude/
+
+# verify 回归脚本的可再生工件（截图/JSON），脚本本身入库
+verify/out/
+verify/shots/
