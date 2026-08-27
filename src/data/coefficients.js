@@ -89,9 +89,9 @@ export const defaultConfig = {
   },
 }
 
-// 分省参数的统一来源说明（利用小时 + 电价）
-const PROVINCE_SOURCE =
-  '演示假设值：利用小时参考中国气象局太阳能资源区划典型区间；电价参考 2024–2025 各省工商业购电大致水平'
+// 分省参数的分组来源说明（各注各的，避免两组共用一条互相夹带无关半句）
+const PROVINCE_SUN_SOURCE = '演示假设值：利用小时参考中国气象局太阳能资源区划典型区间'
+const PROVINCE_PRICE_SOURCE = '演示假设值：电价参考 2024–2025 各省工商业购电大致水平'
 
 // 分省峰谷价差来源（真实数据，独立公开数据项）：储能头条/国际能源网按月汇总自国网、南网分省公告
 const SPREAD_SOURCE =
@@ -106,13 +106,14 @@ const OM_SOURCE = '演示假设值：年运维费占初始投资比例，按行�
 const LIFE_SOURCE = (years, basis) => `演示假设值：计算期 ${years} 年（${basis}）`
 
 // 分省参数面板区（scope: public）：按「利用小时 / 电价 / 峰谷价差」拆组，组内字段标签只留省名；
+// indexed: true 标记组内为省名字段 → 面板按拼音首字母分组渲染并挂右缘索引条；
 // source 可按字段覆盖（峰谷价差的兜底省单独标注，不与真实数据混淆）
 const provinceField = (prov, key, unit, step, source) => ({
   path: `provinces.${prov}.${key}`,
   label: prov,
   unit,
   step,
-  source: source ?? PROVINCE_SOURCE,
+  source,
 })
 
 const provinceSections = [
@@ -120,22 +121,25 @@ const provinceSections = [
     scope: 'public',
     title: '分省年等效利用小时',
     hint: '各省太阳能资源差异，直接影响光伏发电量测算',
+    indexed: true,
     fields: Object.keys(defaultConfig.provinces).map((prov) =>
-      provinceField(prov, 'sunHours', 'h', 10),
+      provinceField(prov, 'sunHours', 'h', 10, PROVINCE_SUN_SOURCE),
     ),
   },
   {
     scope: 'public',
     title: '分省工商业电价',
     hint: '各省工商业购电价格，影响发电收益 / 购电成本测算',
+    indexed: true,
     fields: Object.keys(defaultConfig.provinces).map((prov) =>
-      provinceField(prov, 'elecPrice', '元/kWh', 0.01),
+      provinceField(prov, 'elecPrice', '元/kWh', 0.01, PROVINCE_PRICE_SOURCE),
     ),
   },
   {
     scope: 'public',
     title: '分省峰谷价差',
     hint: '一般工商业 1-10kV 峰谷价差（2026年8月代理购电），直接决定储能套利收益',
+    indexed: true,
     fields: Object.keys(defaultConfig.provinces).map((prov) =>
       provinceField(
         prov,

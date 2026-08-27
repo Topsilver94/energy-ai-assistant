@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RotateCcw, X } from 'lucide-react'
 import { coefficientSections } from '../../data/coefficients'
 import { benchmarkSection } from '../../data/benchmarks'
+import { groupFieldsByInitial } from '../../data/provinceIndex'
 import { useConfigStore, buildDefaultConfig } from '../../stores/configStore'
 
 import { getByPath, setByPath } from '../../utils/path'
@@ -86,8 +87,10 @@ export default function ExpertPanel({ open, onClose, scope = 'expert' }) {
   // ── 栏目索引：scrollspy + 点击定位 ──
   const scrollRef = useRef(null)
   const [activeIdx, setActiveIdx] = useState(0)
+  const [activeLetter, setActiveLetter] = useState(null)
 
-  // 滚动区顶缘命中的最后一个分组即为当前分组；贴底时锁定末组（末组较短时不再下滚的边界）
+  // 滚动区顶缘命中的最后一个分组即为当前分组；贴底时锁定末组（末组较短时不再下滚的边界）。
+  // 分省组内同步测算当前首字母（最后一个越过顶缘的字母头），驱动右缘索引条高亮
   const handleSpy = useCallback(() => {
     const el = scrollRef.current
     if (!el) return
@@ -97,11 +100,16 @@ export default function ExpertPanel({ open, onClose, scope = 'expert' }) {
     }
     const top = el.getBoundingClientRect().top
     let current = 0
-    el.querySelectorAll('section[id^="expert-sec-"]').forEach((node, i) => {
+    el.querySelectorAll(`section[id^="expert-sec-${scope}-"]`).forEach((node, i) => {
       if (node.getBoundingClientRect().top <= top + 24) current = i
     })
     setActiveIdx(current)
-  }, [sections])
+    let letter = null
+    el.querySelectorAll(`[id^="expert-letter-${scope}-"]`).forEach((node) => {
+      if (node.getBoundingClientRect().top <= top + 24) letter = node.id.split('-').pop()
+    })
+    setActiveLetter(letter)
+  }, [sections, scope])
 
   // 打开时按保留的滚动位置初始化高亮（rAF 等布局稳定后再测量）
   useEffect(() => {
@@ -115,11 +123,25 @@ export default function ExpertPanel({ open, onClose, scope = 'expert' }) {
   const jumpTo = (i) => {
     setActiveIdx(i)
     scrollRef.current
-      ?.querySelector(`#expert-sec-${i}`)
+      ?.querySelector(`#expert-sec-${scope}-${i}`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  // 首字母定位：目标为当前分省组内的字母头（非分省组时索引条不渲染，不会触发）
+  const jumpToLetter = (letter) => {
+    setActiveLetter(letter)
+    scrollRef.current
+      ?.querySelector(`#expert-letter-${scope}-${activeIdx}-${letter}`)
       ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   const fieldCount = sections.reduce((sum, s) => sum + s.fields.length, 0)
+
+  // 分省首字母索引：抽屉含分省组时滚动区右缘让位；索引条数据取当前分省组的字母分组
+  const hasIndexed = sections.some((s) => s.indexed)
+  const railGroups = sections[activeIdx]?.indexed
+    ? groupFieldsByInitial(sections[activeIdx].fields)
+    : null
 
   // 抽屉身份：expert 可调系数；public 公开参考（低频校准，同样走保存生效）
   const meta =
@@ -187,14 +209,26 @@ export default function ExpertPanel({ open, onClose, scope = 'expert' }) {
           ))}
         </div>
 
-        {/* 分组表单（滚动区） */}
-        <div ref={scrollRef} onScroll={handleSpy} className="flex-1 overflow-y-auto px-6 py-4">
-          {sections.map((section, i) => {
-            const shared = sharedSource(section)
-            return (
+        {/* 分组表单（滚动区，外包一层用于挂浮动索引条；含分省组时右缘留出索引条位） */}
+        <div className="relative flex-1 overflow-hidden">
+          <div
+            ref={scrollRef}
+            onScroll={handleSpy}
+            className={`h-full overflow-y-auto py-4 ${hasIndexed ? 'pl-6 pr-12' : 'px-6'}`}
+          >
+            {sections.map((section, i) => {
+              const shared = sharedSource(section)
+              // 分省组：字段按拼音首字母分组，字母头作为索引条锚点；普通组保持原序
+              const rows = section.indexed
+                ? groupFieldsByInitial(section.fields).flatMap(({ letter, fields }) => [
+                    { kind: 'letter', key: `letter-${i}-${letter}`, letter },
+                    ...fields.map((field) => ({ kind: 'field', key: field.path, field })),
+                  ])
+                : section.fields.map((field) => ({ kind: 'field', key: field.path, field }))
+              return (
             <section
               key={section.title}
-              id={`expert-sec-${i}`}
+              id={`expert-sec-${scope}-${i}`}
               className="border-b border-volt/50 py-4 last:border-0"
             >
               {/* 分组题：比字段标签高一级（§6 字号阶梯），绿方标 + 绿分隔线双重锚点 */}
@@ -217,42 +251,80 @@ export default function ExpertPanel({ open, onClose, scope = 'expert' }) {
                 </p>
               )}
               <div>
-                {section.fields.map((field) => (
-                  <div
-                    key={field.path}
-                    className="grid grid-cols-[1fr_162px] items-center gap-3 border-b border-line/40 py-2.5 last:border-0"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm text-paper">{field.label}</p>
-                      {!shared && (
-                        <p
-                          className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-paper-mute/80"
-                          title={field.source}
-                        >
-                          {field.source}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="number"
-                        step={field.step}
-                        value={String(getByPath(draft, field.path) ?? '')}
-                        onChange={(e) =>
-                          setDraft((d) => setByPath(d, field.path, e.target.value))
-                        }
-                        className="tabular w-full rounded-xl bg-ink-raised px-3 py-1.5 text-right font-mono text-sm text-paper outline-none transition-shadow focus:ring-2 focus:ring-volt"
-                      />
-                      <span className="w-14 shrink-0 text-[11px] leading-tight text-paper-mute">
-                        {field.unit}
+                {rows.map((row) =>
+                  row.kind === 'letter' ? (
+                    <div
+                      key={row.key}
+                      id={`expert-letter-${scope}-${i}-${row.letter}`}
+                      className="mb-1 mt-3 first:mt-0"
+                    >
+                      <span className="rounded bg-ink-raised px-1.5 py-0.5 font-mono text-[11px] text-paper-mute">
+                        {row.letter}
                       </span>
                     </div>
-                  </div>
-                ))}
+                  ) : (
+                    <div
+                      key={row.key}
+                      className="grid grid-cols-[1fr_162px] items-center gap-3 border-b border-line/40 py-2.5 last:border-0"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm text-paper">{row.field.label}</p>
+                        {!shared && (
+                          <p
+                            className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-paper-mute/80"
+                            title={row.field.source}
+                          >
+                            {row.field.source}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          step={row.field.step}
+                          value={String(getByPath(draft, row.field.path) ?? '')}
+                          onChange={(e) =>
+                            setDraft((d) => setByPath(d, row.field.path, e.target.value))
+                          }
+                          className="tabular w-full rounded-xl bg-ink-raised px-3 py-1.5 text-right font-mono text-sm text-paper outline-none transition-shadow focus:ring-2 focus:ring-volt"
+                        />
+                        <span className="w-14 shrink-0 text-[11px] leading-tight text-paper-mute">
+                          {row.field.unit}
+                        </span>
+                      </div>
+                    </div>
+                  ),
+                )}
               </div>
             </section>
             )
           })}
+          </div>
+
+          {/* 分省首字母索引条：浮动右缘（避开滚动条），点击定位当前分省组的字母头；
+              高亮随滚动联动，非分省组时整条隐藏 */}
+          {railGroups && (
+            <nav
+              aria-label="省份首字母索引"
+              className="absolute right-5 top-1/2 z-10 flex -translate-y-1/2 flex-col"
+            >
+              {railGroups.map(({ letter, fields }) => (
+                <button
+                  key={letter}
+                  type="button"
+                  title={fields.map((f) => f.label).join('、')}
+                  onClick={() => jumpToLetter(letter)}
+                  className={`w-5 rounded text-center font-mono text-[11px] leading-4 transition-colors ${
+                    letter === activeLetter
+                      ? 'bg-volt/10 font-medium text-volt'
+                      : 'text-paper-mute hover:bg-ink-raised hover:text-paper'
+                  }`}
+                >
+                  {letter}
+                </button>
+              ))}
+            </nav>
+          )}
         </div>
 
         {/* 抽屉脚：恢复默认（草稿级）+ 保存配置（提交 store） */}
