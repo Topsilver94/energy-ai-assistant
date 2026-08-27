@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { Fan, Gauge, Lightbulb, Star } from 'lucide-react'
 import { useConfigStore } from '../../stores/configStore'
 import { useDiagnosisStore } from '../../stores/diagnosisStore'
-import { calculateDiagnosis, getRecommendations } from '../../utils/diagnosis'
+import { calculateDiagnosis, getRecommendations, eraOf, pvMandatedHint } from '../../utils/diagnosis'
 import { benchmarkTypes } from '../../data/benchmarks.js'
 import RecommendationList from './RecommendationList'
 
@@ -15,9 +15,6 @@ const RATING_TONES = {
   一般: 'border-line bg-ink-raised text-paper-mute',
   需改进: 'border-amber/40 bg-amber/10 text-amber',
 }
-
-// 老建筑提示阈值（展示提示，非财务系数）
-const OLD_BUILDING_YEAR = 2000
 
 /**
  * 模块① 结果区：指标摘要 + 基准对比条 + 结论卡（既有=节能潜力/评级；新建=设计校核）
@@ -43,6 +40,7 @@ export default function DiagnosisResults({ recs, onApply }) {
         year: inputs.year,
         area: Number(inputs.area),
         province: inputs.province,
+        roofType: inputs.roofType,
       })
     }
   }, [config, isDiagnosisDone])
@@ -62,6 +60,9 @@ export default function DiagnosisResults({ recs, onApply }) {
   }
 
   const isNew = diagnosis.buildingNature === 'new'
+  // 建成年代 → 标准代际侧重提示（确定性派生；新建/未填年份不展示）
+  const era = isNew ? null : eraOf(diagnosis.year)
+  const pvHint = era ? pvMandatedHint(diagnosis.year) : null
   const recommendations = isNew ? [] : getRecommendations(diagnosis.buildingType, diagnosis.savingPotential)
   const typeLabel =
     benchmarkTypes.find((b) => b.key === diagnosis.buildingType)?.label ?? diagnosis.buildingType
@@ -215,9 +216,10 @@ export default function DiagnosisResults({ recs, onApply }) {
               )
             })}
           </div>
-          {Number(diagnosis.year) > 0 && Number(diagnosis.year) <= OLD_BUILDING_YEAR && (
+          {era && (
             <p className="mt-2 text-[12px] leading-relaxed text-paper-mute">
-              建成年份 ≤ {OLD_BUILDING_YEAR} 年，建议同步评估外窗与围护结构保温性能。
+              建成于 {diagnosis.year} 年 · {era.label}：{era.focus}。
+              {pvHint ? ` ${pvHint}。` : ''}
             </p>
           )}
         </div>

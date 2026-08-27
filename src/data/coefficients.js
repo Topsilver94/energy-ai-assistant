@@ -46,7 +46,7 @@ export const defaultConfig = {
   // 分省参数：年等效利用小时 + 工商业电价 + 峰谷价差（面板按省分条列出）。
   // 覆盖大陆 31 个省级单位（22 省 + 5 自治区 + 4 直辖市），按华北→东北→华东→华中→华南→西南→西北排列；
   // 省内价区差异（如深圳 vs 广东其余、蒙西 vs 蒙东）不建模，取省量级，用户可在公开数据抽屉按项目地微调。
-  // peakValleySpread 为真实数据：2026年8月电网代理购电（一般工商业 1-10kV）峰谷价差，
+  // peakValleySpread 为真实数据：电网代理购电（一般工商业 1-10kV）峰谷价差，月份见下方 SPREAD_AS_OF 常量，
   // 取单一制与两部制标准档较高者、不含 1.5 倍上浮档（省内多价区如广东取珠三角五市档）；
   // 未收录的 6 省按演示假设值兜底——来源见下方 SPREAD_SOURCE / SPREAD_FALLBACK_SOURCE
   provinces: {
@@ -89,17 +89,20 @@ export const defaultConfig = {
   },
 }
 
+// ── 数据日期常量（年更编辑点：峰谷价差换月只改 SPREAD_AS_OF、分省电价换年只改 ELECP_AS_OF，
+//    所有来源句与界面提示自动收敛，不再散落多处手改） ──
+export const SPREAD_AS_OF = '2026年8月' // 峰谷价差：电网代理购电月度表所属月份
+export const ELECP_AS_OF = '2024–2025' // 分省电价：工商业购电水平大致区间
+
 // 分省参数的分组来源说明（各注各的，避免两组共用一条互相夹带无关半句）
 const PROVINCE_SUN_SOURCE = '演示假设值：利用小时参考中国气象局太阳能资源区划典型区间'
-const PROVINCE_PRICE_SOURCE = '演示假设值：电价参考 2024–2025 各省工商业购电大致水平'
+const PROVINCE_PRICE_SOURCE = `演示假设值：电价参考 ${ELECP_AS_OF} 各省工商业购电大致水平`
 
 // 分省峰谷价差来源（真实数据，独立公开数据项）：储能头条/国际能源网按月汇总自国网、南网分省公告
-const SPREAD_SOURCE =
-  '储能头条/国际能源网《2026年8月电网代理购电价格》：一般工商业 1-10kV，取单一制与两部制标准档较高者（不含 1.5 倍上浮档）'
+const SPREAD_SOURCE = `储能头条/国际能源网《${SPREAD_AS_OF}电网代理购电价格》：一般工商业 1-10kV，取单一制与两部制标准档较高者（不含 1.5 倍上浮档）`
 // 该月表未收录的省份 → 演示假设值兜底（红线：不编造数据），后续月度表出数后替换
 const SPREAD_MISSING = new Set(['吉林', '河南', '湖南', '海南', '云南', '西藏'])
-const SPREAD_FALLBACK_SOURCE =
-  '演示假设值：2026年8月代理购电表未收录该省，暂按已收录 25 省中位水平取整 0.60 元/kWh 兜底'
+const SPREAD_FALLBACK_SOURCE = `演示假设值：${SPREAD_AS_OF}代理购电表未收录该省，暂按已收录 25 省中位水平取整 0.60 元/kWh 兜底`
 
 // 年运维比例 / 计算期的统一来源说明
 const OM_SOURCE = '演示假设值：年运维费占初始投资比例，按行业运维报价量级'
@@ -138,7 +141,7 @@ const provinceSections = [
   {
     scope: 'public',
     title: '分省峰谷价差',
-    hint: '一般工商业 1-10kV 峰谷价差（2026年8月代理购电），直接决定储能套利收益',
+    hint: `一般工商业 1-10kV 峰谷价差（${SPREAD_AS_OF}代理购电），直接决定储能套利收益`,
     indexed: true,
     fields: Object.keys(defaultConfig.provinces).map((prov) =>
       provinceField(

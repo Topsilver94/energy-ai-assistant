@@ -14,6 +14,8 @@
  */
 import { recommendationRules as R } from '../data/recommendationRules.js'
 import { calculateFeasibility } from './finance.js'
+import { SPREAD_AS_OF } from '../data/coefficients.js'
+import { pvMandatedHint } from './diagnosis.js'
 
 const clamp = (v) => Math.min(100, Math.max(0, v))
 const round1 = (v) => Math.round(v * 10) / 10
@@ -64,19 +66,21 @@ const estimateOf = (key, scale, province, config) => {
 
 /**
  * @param {{ buildingNature?: 'existing'|'new', buildingType: string, area: number|string,
- *            province: string, roofType?: string }} params
+ *            province: string, roofType?: string, year?: number|string }} params
  * @param {object} config configStore 纯数值配置
  * @returns {Array<{ key, label, scaleUnit, score, level, reasons: string[], suggestedScale,
  *            confidence: 'high'|'medium'|'verify', estimate: object|null }>} 按 score 降序
  */
 export const buildRecommendations = (
-  { buildingNature = 'existing', buildingType, area: rawArea, province, roofType: rawRoof },
+  { buildingNature = 'existing', buildingType, area: rawArea, province, roofType: rawRoof, year: rawYear },
   config,
 ) => {
   const area = Number(rawArea)
   if (!Number.isFinite(area) || area <= 0) return []
   const prov = config.provinces[province] ?? Object.values(config.provinces)[0]
   const isNew = buildingNature === 'new'
+  // GB 55015 光伏强条：既有建成 ≥2022 年 → 光伏推荐附余量核对提示（新建按强条设计，不受此限）
+  const pvHint = isNew ? null : pvMandatedHint(rawYear)
 
   // ── 光伏：屋面条件推导——既有按屋面类型（平/坡/彩钢，未选按类型典型值），
   //    新建不问屋面（设计未定）直接按 BIPV 一体化满铺口径；规模 kW（备案/并网通行） ──
@@ -109,7 +113,7 @@ export const buildRecommendations = (
   )
   const roofRatioText = Math.round(roofRatio * 100) / 100
 
-  // ── 储能：峰谷价差直读分省公开数据（2026年8月代理购电，取单一制与两部制较高档） ──
+  // ── 储能：峰谷价差直读分省公开数据（代理购电月度表，日期随 coefficients.js 的 SPREAD_AS_OF 常量） ──
   const spread = prov.peakValleySpread
   const strongSpread = spread >= R.storageStrongSpread.values
   const storageKwh = Math.max(R.storageMinKwh.values, Math.round(pvKw * R.storageToPvRatio.values))
@@ -153,6 +157,7 @@ export const buildRecommendations = (
           : roofNote
             ? [roofNote]
             : []),
+        ...(pvHint ? [pvHint] : []),
       ],
       estimate: estimateOf('pv', pvKw, province, config),
     },
@@ -165,7 +170,7 @@ export const buildRecommendations = (
       suggestedScale: storageKwh,
       confidence: 'medium',
       reasons: [
-        `当地一般工商业峰谷价差 ${spread.toFixed(2)} 元/kWh（2026年8月代理购电口径）`,
+        `当地一般工商业峰谷价差 ${spread.toFixed(2)} 元/kWh（${SPREAD_AS_OF}代理购电口径）`,
         strongSpread
           ? '价差达到两充两放经济边界，优先级高'
           : '价差一般，收益依赖充放策略精细化',

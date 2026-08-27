@@ -101,6 +101,7 @@ export default function DiagnosisModule({ wide = false, onApplied }) {
               area: diagnosis.area,
               province: diagnosis.province,
               roofType: diagnosis.roofType,
+              year: diagnosis.year,
             },
             config,
           )

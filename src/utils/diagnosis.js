@@ -10,6 +10,7 @@
  *         不输出节能潜力（无实际基线，红线：不编造数据）
  */
 import { measures } from '../data/measures.js'
+import { recommendationRules as R } from '../data/recommendationRules.js'
 
 // 能效评级分档（分类逻辑，非财务系数）：实际/基准 < 0.8 优秀，< 1.2 一般，否则需改进
 const RATING_GOOD = 0.8
@@ -95,4 +96,26 @@ export const calculateDiagnosis = (
 export const getRecommendations = (buildingType, savingPotential) => {
   const starred = savingPotential > STAR_THRESHOLD
   return (measures[buildingType] ?? []).slice(0, 3).map((text) => ({ text, starred }))
+}
+
+/**
+ * 建成年代 → 标准代际分桶（改造侧重提示，确定性派生）。
+ * 年份对能耗是「先验」而非决定量（被运行工况与改造史淹没），故只进文案不进数字；
+ * 年份无效（新建/未填）返回 null，调用方不展示。
+ */
+export const eraOf = (year) => {
+  const y = Number(year)
+  if (!Number.isFinite(y) || y <= 0) return null
+  return R.eraBuckets.values.find((b) => y <= b.maxYear) ?? null
+}
+
+/**
+ * GB 55015-2021 光伏强条提示：2022 年起新建公共建筑光伏应装尽装，
+ * 既有建筑建成 ≥2022 年时推荐屋顶光伏前应先核已装容量与屋面/并网余量。
+ * 返回提示句；年份无效或早于强条年份返回 null（调用方仅对既有建筑使用）。
+ */
+export const pvMandatedHint = (year) => {
+  const y = Number(year)
+  if (!Number.isFinite(y) || y < R.eraBuckets.pvMandatedFrom) return null
+  return '该年代起新建按 GB 55015-2021 多已强配光伏，建议先核已装容量与屋面、并网余量'
 }

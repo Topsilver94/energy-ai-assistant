@@ -74,6 +74,7 @@ const log = (m) => {
     fiveSections: ['#'.length] && ['一、项目概述', '二、财务分析', '三、技术路径', '四、建设节奏', '五、预期收益'].every((s) => rt.includes(s) || rt.includes(s.replace(/一、|二、|三、|四、|五、/, ''))),
     phasingInjected: rt.includes('一期') || rt.includes('一次性建成'),
     sensitivityInjected: rt.includes('最敏感变量'),
+    eraNoteInjected: rt.includes('建成于 2010 年 · 节能 50%（GB 50189-2005）'),
   }
 
   // ── 4. Key 不落 localStorage ──

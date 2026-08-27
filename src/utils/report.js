@@ -10,7 +10,7 @@
  * 红线：模板里只出现文案与格式，所有数字来自入参（store 结果 + config 系数）。
  */
 import { PROJECT_TYPES } from '../stores/projectStore.js'
-import { getRecommendations } from './diagnosis.js'
+import { getRecommendations, eraOf, pvMandatedHint } from './diagnosis.js'
 import { buildPhasing } from './phasing.js'
 import { buildSensitivity } from './sensitivity.js'
 import { coolingDesignKw } from './recommend.js'
@@ -90,7 +90,9 @@ export const buildReportDraft = (project, diagnosis, config) => {
   const date = new Date().toLocaleString('zh-CN', { hour12: false })
   const isNew = d.buildingNature === 'new'
   const recommendations = isNew ? [] : getRecommendations(di.buildingType, d.savingPotential ?? 0)
-  const oldBuilding = !isNew && Number(di.year) > 0 && Number(di.year) <= 2000
+  // 建成年代 → 标准代际侧重（既有注入；新建无年份语义）
+  const era = isNew ? null : eraOf(di.year)
+  const pvHint = era ? pvMandatedHint(di.year) : null
 
   const payback = f.paybackPeriod === 'N/A' ? 'N/A' : `${fmt(f.paybackPeriod)} 年`
   const params = keyParams(systems, config, project.inputs.province)
@@ -116,7 +118,7 @@ export const buildReportDraft = (project, diagnosis, config) => {
 ## 一、项目概述
 
 - **系统组合**：${combo}（落地省份 ${project.inputs.province}）
-- **建筑概况**：${isNew ? '新建' : '既有'}${di.buildingType ?? '—'}建筑 · ${di.area ?? '—'} ㎡${isNew ? '' : ` · ${di.year ?? '—'} 年建成`}
+- **建筑概况**：${isNew ? '新建' : '既有'}${di.buildingType ?? '—'}建筑 · ${di.area ?? '—'} ㎡${isNew ? '' : ` · ${di.year ?? '—'} 年建成${era ? ` · ${era.label}` : ''}`}
 - **诊断结论**：${
     isNew
       ? d.designChecked
@@ -150,7 +152,7 @@ ${sensLines}
 ## 三、技术路径（${isNew ? '新建 · 一体化设计建议' : '模块① 诊断建议'}）
 
 ${numberedMeasures || '—'}
-${oldBuilding ? '\n> 注：建成年份 ≤ 2000 年，建议同步评估外窗与围护结构保温性能。\n' : ''}
+${era ? `\n> 注：建成于 ${di.year} 年 · ${era.label}：${era.focus}。${pvHint ? ` ${pvHint}。` : ''}\n` : ''}
 ## 四、建设节奏建议（按回收期确定性派生）
 
 ${phasing ? phasing.lines.join('\n') : '—'}

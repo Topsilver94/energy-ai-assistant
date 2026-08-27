@@ -9,9 +9,9 @@ import { useConfigStore } from '../../stores/configStore'
 const ROOF_OPTIONS = Object.keys(recommendationRules.roofTypes.values)
 const TYPICAL_ROOF = recommendationRules.typicalRoof.values
 
-// 建造年份滑杆范围（UI 边界，非计算系数）
+// 建造年份滑杆范围（UI 边界，非计算系数）：上限取当前年份，跨年自动前滚（防腐化）
 const YEAR_MIN = 1980
-const YEAR_MAX = 2025
+const YEAR_MAX = new Date().getFullYear()
 
 const inputClass =
   'w-full rounded-xl bg-ink-raised px-3 py-2.5 text-[15px] text-paper outline-none transition-shadow placeholder:text-paper-faint focus:ring-2 focus:ring-volt'

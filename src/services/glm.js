@@ -13,6 +13,7 @@ import { buildPhasing } from '../utils/phasing.js'
 import { buildSensitivity } from '../utils/sensitivity.js'
 import { coolingDesignKw } from '../utils/recommend.js'
 import { newBuildMeasures } from '../data/measures.js'
+import { eraOf, pvMandatedHint } from '../utils/diagnosis.js'
 
 const SYSTEM_PROMPT =
   '你是一位拥有 15 年经验的综合能源资深专家，擅长光伏、储能、供冷及节能改造项目的财务分析与技术落地。' +
@@ -37,6 +38,9 @@ export const buildPrompt = (project, diagnosis, config) => {
   const items = project.feasibility?.items ?? []
   const d = diagnosis.diagnosis ?? {}
   const di = diagnosis.inputs ?? {}
+  // 建成年代 → 标准代际侧重（既有注入，确定性派生；新建无年份语义不注入）
+  const era = d.buildingNature === 'new' ? null : eraOf(di.year)
+  const pvHint = era ? pvMandatedHint(di.year) : null
   // 集中供冷双口径：已知建筑类型时折算设计冷负荷（设备口径）随组合描述注入，供 AI 表述供冷能力
   const combo = selected
     .map((t) => {
@@ -92,7 +96,9 @@ export const buildPrompt = (project, diagnosis, config) => {
         `约束值基准：${fmt(d.benchmarkIntensity, 0)} kWh/㎡·a\n` +
         `设计校核：${d.checkResult ?? '未校核（按约束值预估）'}\n` +
         `节能潜力：—（新建无实际能耗基线，待投产后核算）\n`
-      : `建造年份：${di.year ?? '—'} 年\n` +
+      : `建造年份：${di.year ?? '—'} 年${era ? `，属${era.label}` : ''}\n` +
+        (era ? `年代改造侧重：${era.focus}（按标准代际确定性派生，润色时保持方向与结论）\n` : '') +
+        (pvHint ? `光伏余量提示：${pvHint}（确定性提示，请保留）\n` : '') +
         `年用电量：${fmt(d.annualConsumption / 1e4)} 万 kWh\n` +
         `实际单位能耗：${fmt(d.actualIntensity)} kWh/㎡·a\n` +
         `行业基准能耗：${fmt(d.benchmarkIntensity, 0)} kWh/㎡·a\n` +
