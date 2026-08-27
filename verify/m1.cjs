@@ -33,13 +33,13 @@ const log = (msg) => {
   await page.screenshot({ path: path.join(shotDir, 'm1-01-initial.png'), fullPage: true })
   log('首屏加载完成（默认页诊断 → 已切模块②）')
 
-  // 2. 填入规模：光伏 2 MW（默认已选），再开储能并填 1 MWh，省份保持默认广东
+  // 2. 填入规模：光伏 2000 kW（默认已选），再开储能并填 1000 kWh，省份保持默认广东
   const pvInput = page.locator('label:has-text("分布式光伏 规模") input[type="number"]')
-  await pvInput.fill('2')
+  await pvInput.fill('2000')
   await page.locator('button[aria-pressed]:has-text("储能")').click()
   const storageInput = page.locator('label:has-text("储能 规模") input[type="number"]')
-  await storageInput.fill('1')
-  log('输入：广东 · 光伏 2MW + 储能 1MWh')
+  await storageInput.fill('1000')
+  log('输入：广东 · 光伏 2000kW + 储能 1000kWh')
 
   // 3. 提交测算
   await page.locator('button:has-text("开始测算")').click()

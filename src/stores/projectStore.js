@@ -3,8 +3,8 @@ import { create } from 'zustand'
 // 模块② 系统类型枚举：与 config 系数分组一一对应（组合四项，多选）；
 // scaleUnit 用于各系统规模输入框的动态单位标签与占位提示
 export const PROJECT_TYPES = [
-  { key: 'pv', label: '分布式光伏', scaleUnit: 'MW', placeholder: '如 2' },
-  { key: 'storage', label: '储能', scaleUnit: 'MWh', placeholder: '如 1' },
+  { key: 'pv', label: '分布式光伏', scaleUnit: 'kW', placeholder: '如 2000' },
+  { key: 'storage', label: '储能', scaleUnit: 'kWh', placeholder: '如 1000' },
   { key: 'cooling', label: '集中供冷', scaleUnit: '万㎡', placeholder: '如 3' },
   { key: 'charger', label: '充电桩', scaleUnit: '桩', placeholder: '如 10' },
 ]

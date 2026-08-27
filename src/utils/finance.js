@@ -54,10 +54,10 @@ const perType = (projectType, scale, province, config) => {
 
   if (projectType === 'pv') {
     const { pv } = config
-    // 投资：scale(MW) × 1e6 W/MW × 元/W ÷ 1e4 元/万元 = scale × 100 × capexPerWatt
-    const capex = scale * 100 * pv.capexPerWatt
-    // 年发电量 = 装机(kW) × 年等效利用小时，再按系统效率 PR 折减
-    const genKwh = scale * 1000 * prov.sunHours * pv.performanceRatio
+    // 投资：scale(kW) × 1000 W/kW × 元/W ÷ 1e4 元/万元 = scale × capexPerWatt / 10
+    const capex = (scale * 1000 * pv.capexPerWatt) / 1e4
+    // 年发电量 = 装机(kW) × 年等效利用小时(h)，再按系统效率 PR 折减 → kWh
+    const genKwh = scale * prov.sunHours * pv.performanceRatio
     return {
       capex,
       gross: (genKwh * price) / 1e4,
@@ -69,10 +69,10 @@ const perType = (projectType, scale, province, config) => {
 
   if (projectType === 'storage') {
     const { storage } = config
-    // 投资：scale(MWh) × 1000 kWh/MWh × 元/kWh ÷ 1e4
-    const capex = (scale * 1000 * storage.capexPerKWh) / 1e4
+    // 投资：scale(kWh) × 元/kWh ÷ 1e4
+    const capex = (scale * storage.capexPerKWh) / 1e4
     // 年放电量 = 容量(kWh) × 每日循环 × 365；套利收益 = 放电量 × 分省峰谷价差（元/kWh，公开数据项）
-    const dischargeKwh = scale * 1000 * storage.cyclesPerDay * 365
+    const dischargeKwh = scale * storage.cyclesPerDay * 365
     return {
       capex,
       gross: (dischargeKwh * prov.peakValleySpread) / 1e4,

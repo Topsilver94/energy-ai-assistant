@@ -36,9 +36,9 @@ const dataCards = (page) =>
   await page.locator('nav[aria-label="模块导航"] button:has-text("锁定收益")').click()
 
   // ── 准备：完成①② ──
-  await page.locator('label:has-text("分布式光伏 规模") input').fill('2')
+  await page.locator('label:has-text("分布式光伏 规模") input').fill('2000')
   await page.locator('button[aria-pressed]:has-text("储能")').click()
-  await page.locator('label:has-text("储能 规模") input').fill('1')
+  await page.locator('label:has-text("储能 规模") input').fill('1000')
   await page.locator('button:has-text("开始测算")').click()
   await page.locator('text=组合投资').first().waitFor({ timeout: 5000 })
   await page.locator('nav[aria-label="模块导航"] button:has-text("挖掘痛点")').click()

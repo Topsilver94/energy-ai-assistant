@@ -37,11 +37,11 @@ const log = (m) => {
   report.extracted.genBtnVisibleWhenLocked = await page.locator('button:has-text("生成方案报告")').isVisible()
   log('初始态：模块③ 锁定（依赖①②）')
 
-  // ── 1. 完成①：光伏2 + 储能1 ──
+  // ── 1. 完成①：光伏2000 + 储能1000 ──
   await page.locator('nav[aria-label="模块导航"] button:has-text("锁定收益")').click()
-  await page.locator('label:has-text("分布式光伏 规模") input').fill('2')
+  await page.locator('label:has-text("分布式光伏 规模") input').fill('2000')
   await page.locator('button[aria-pressed]:has-text("储能")').click()
-  await page.locator('label:has-text("储能 规模") input').fill('1')
+  await page.locator('label:has-text("储能 规模") input').fill('1000')
   await page.locator('button:has-text("开始测算")').click()
   await page.locator('text=组合投资').first().waitFor({ timeout: 5000 })
   log('模块② 完成')

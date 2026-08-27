@@ -9,14 +9,14 @@
  */
 
 export const defaultConfig = {
-  // 光伏（规模单位：MW）
+  // 光伏（规模单位：kW，备案/并网/EPC 报价通行功率口径）
   pv: {
     capexPerWatt: 3.5, // 元/W，工商业分布式初始投资
     performanceRatio: 0.9, // 系统效率 PR（灰尘/线损/逆变器损耗）
     omRatioPerYear: 0.01, // 年运维费占初始投资比例
     lifetimeYears: 25, // 计算期，组件功率质保 25 年
   },
-  // 储能（规模单位：MWh）；套利收益按分省峰谷价差直接计（provinces.X.peakValleySpread，公开数据项）
+  // 储能（规模单位：kWh，工商业储能柜通行能量口径）；套利收益按分省峰谷价差直接计（provinces.X.peakValleySpread，公开数据项）
   storage: {
     capexPerKWh: 1200, // 元/kWh，即 1.2 元/Wh
     cyclesPerDay: 2, // 两充两放，峰谷套利典型策略
@@ -229,7 +229,7 @@ export const coefficientSections = [
         label: '单位面积投资',
         unit: '元/㎡',
         step: 20,
-        source: '演示假设值：区域能源站 + 管网 + 用户接入的投资量级',
+        source: '演示假设值：能源站 + 管网 + 用户接入的投资量级',
       },
       {
         path: 'cooling.kwhPerSqm',
@@ -257,7 +257,7 @@ export const coefficientSections = [
         label: '集中供冷 COP',
         unit: '',
         step: 0.1,
-        source: '演示假设值：区域能源站高效机房设计工况 COP 5.0–6.0',
+        source: '演示假设值：高效机房设计工况 COP 5.0–6.0',
       },
       {
         path: 'cooling.omRatioPerYear',

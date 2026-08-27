@@ -66,18 +66,18 @@ export const buildRecommendations = (
   const prov = config.provinces[province] ?? Object.values(config.provinces)[0]
   const isNew = buildingNature === 'new'
 
-  // ── 光伏：屋顶可用面积推导（高层系数低、低层大屋面系数高） ──
+  // ── 光伏：屋顶可用面积推导（高层系数低、低层大屋面系数高）；规模口径 kW（备案/并网通行） ──
   const roofRatio = R.roofUsableRatio.values[buildingType] ?? 0.4
   const roofArea = Math.round(area * roofRatio)
-  const pvMw = Math.max(R.pvMinMw.values, round1((roofArea * R.pvKwPerSqm.values) / 1000))
+  const pvKw = Math.max(R.pvMinKw.values, Math.round(roofArea * R.pvKwPerSqm.values))
   const pvScore = clamp(
-    Math.round(40 + Math.min(50, (pvMw / R.pvFullScoreMw.values) * 50) + (isNew ? 5 : 0)),
+    Math.round(40 + Math.min(50, (pvKw / R.pvFullScoreKw.values) * 50) + (isNew ? 5 : 0)),
   )
 
   // ── 储能：峰谷价差直读分省公开数据（2026年8月代理购电，取单一制与两部制较高档） ──
   const spread = prov.peakValleySpread
   const strongSpread = spread >= R.storageStrongSpread.values
-  const storageMwh = Math.max(R.storageMinMwh.values, round1(pvMw * R.storageToPvRatio.values))
+  const storageKwh = Math.max(R.storageMinKwh.values, Math.round(pvKw * R.storageToPvRatio.values))
   const storageScore = clamp(
     Math.round((strongSpread ? 72 : 48) + (STEADY_LOAD_TYPES.includes(buildingType) ? 8 : 0)),
   )
@@ -100,25 +100,25 @@ export const buildRecommendations = (
     {
       key: 'pv',
       label: '分布式光伏',
-      scaleUnit: 'MW',
+      scaleUnit: 'kW',
       score: pvScore,
       level: levelOf(pvScore),
-      suggestedScale: pvMw,
+      suggestedScale: pvKw,
       confidence: 'high',
       reasons: [
         `可用屋顶约 ${roofArea} ㎡（${buildingType}建筑可用系数 ${roofRatio}）`,
-        `按 ${R.pvKwPerSqm.values} kW/㎡ 装机密度 → 建议约 ${pvMw} MW`,
+        `按 ${R.pvKwPerSqm.values} kW/㎡ 装机密度 → 建议约 ${pvKw} kW`,
         ...(isNew ? ['新建可按 BIPV 一体化设计，屋面与结构成本摊薄'] : []),
       ],
-      estimate: estimateOf('pv', pvMw, province, config),
+      estimate: estimateOf('pv', pvKw, province, config),
     },
     {
       key: 'storage',
       label: '储能',
-      scaleUnit: 'MWh',
+      scaleUnit: 'kWh',
       score: storageScore,
       level: levelOf(storageScore),
-      suggestedScale: storageMwh,
+      suggestedScale: storageKwh,
       confidence: 'medium',
       reasons: [
         `当地一般工商业峰谷价差 ${spread.toFixed(2)} 元/kWh（2026年8月代理购电口径）`,
@@ -128,9 +128,9 @@ export const buildRecommendations = (
         ...(STEADY_LOAD_TYPES.includes(buildingType)
           ? [`${buildingType}全天负荷平稳，储能利用率高`]
           : []),
-        `规模按光储配比 1:${R.storageToPvRatio.values} 估算为 ${storageMwh} MWh，需负荷数据修正`,
+        `规模按光储配比 1:${R.storageToPvRatio.values} 估算为 ${storageKwh} kWh，需负荷数据修正`,
       ],
-      estimate: estimateOf('storage', storageMwh, province, config),
+      estimate: estimateOf('storage', storageKwh, province, config),
     },
     {
       key: 'cooling',

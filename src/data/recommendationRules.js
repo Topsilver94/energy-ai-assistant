@@ -15,12 +15,12 @@ export const recommendationRules = {
     values: 0.1,
     source: '演示假设值：屋顶光伏装机密度 0.1 kW/㎡（组件 + 检修通道综合）',
   },
-  pvFullScoreMw: {
-    values: 2,
-    source: '演示假设值：屋顶可装 2 MW 视为满分信号（工商业分布式典型经济规模）',
+  pvFullScoreKw: {
+    values: 2000,
+    source: '演示假设值：屋顶可装 2000 kW（2 MW）视为满分信号（工商业分布式典型经济规模）',
   },
-  pvMinMw: {
-    values: 0.2,
+  pvMinKw: {
+    values: 200,
     source: '演示假设值：分布式光伏最小示范规模',
   },
   storageStrongSpread: {
@@ -29,10 +29,10 @@ export const recommendationRules = {
   },
   storageToPvRatio: {
     values: 0.5,
-    source: '演示假设值：光储配比 1:0.5（工商业常见区间中值），规模需负荷数据修正',
+    source: '演示假设值：光储配比 1:0.5（储能 kWh / 光伏 kW，工商业常见区间中值），规模需负荷数据修正',
   },
-  storageMinMwh: {
-    values: 0.5,
+  storageMinKwh: {
+    values: 500,
     source: '演示假设值：工商业储能最小经济规模',
   },
   coolingMinArea: {
