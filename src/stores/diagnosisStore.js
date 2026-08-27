@@ -1,8 +1,4 @@
 import { create } from 'zustand'
-import { benchmarkTypes } from '../data/benchmarks.js'
-
-// 模块① 建筑类型枚举：与 config.benchmarks 键一一对应
-export const BUILDING_TYPES = benchmarkTypes.map((t) => t.key)
 
 /**
  * 模块① 挖掘痛点（能耗诊断）

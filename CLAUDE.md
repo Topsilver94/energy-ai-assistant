@@ -58,7 +58,7 @@ src/
 │   └── aiStore.js           # API Key（仅内存）+ 生成状态 + 方案文本
 ├── data/
 │   ├── coefficients.js      # 所有系数默认值 + source 来源字段
-│   ├── benchmarks.js        # 建筑能耗基准（办公/商场/医院）
+│   ├── benchmarks.js        # 建筑能耗基准（办公/商场/医院/酒店/高校/数据中心/工业厂房）
 │   ├── recommendationRules.js # 方案配置推荐规则阈值（带 source）
 │   └── measures.js          # 预设措施库 + 新建建筑一体化建议文案
 ├── components/

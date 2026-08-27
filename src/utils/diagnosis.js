@@ -44,7 +44,7 @@ export const calculateDiagnosis = (
 
   const prov = config.provinces[province] ?? Object.values(config.provinces)[0]
   const benchmark = config.benchmarks[buildingType]
-  // 未知类型不静默兜底（错误基准比无结果更误导），表单已限定三种类型
+  // 未知类型不静默兜底（错误基准比无结果更误导），表单类型由 benchmarkTypes 派生
   if (!benchmark) return null
 
   // ── 新建建筑：设计校核 + 预估（无实际电费，不核算节能潜力） ──

@@ -1,11 +1,10 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect } from 'react'
 import { Fan, Gauge, Lightbulb, Star } from 'lucide-react'
 import { useConfigStore } from '../../stores/configStore'
 import { useDiagnosisStore } from '../../stores/diagnosisStore'
 import { calculateDiagnosis, getRecommendations } from '../../utils/diagnosis'
-import { buildRecommendations } from '../../utils/recommend'
+import { benchmarkTypes } from '../../data/benchmarks.js'
 import RecommendationList from './RecommendationList'
-import ValueHeatmap from './ValueHeatmap'
 
 // 措施 Chip 图标按序轮换（照明→Lightbulb，空调风机→Fan，监测→Gauge）
 const CHIP_ICONS = [Lightbulb, Fan, Gauge]
@@ -22,13 +21,13 @@ const OLD_BUILDING_YEAR = 2000
 
 /**
  * 模块① 结果区：指标摘要 + 基准对比条 + 结论卡（既有=节能潜力/评级；新建=设计校核）
- * + 措施 Chips（既有）+ 方案配置推荐 + 投资价值热力图
+ * + 措施 Chips（既有）+ 方案配置推荐；投资价值热力图由容器（index）按布局放置
  *
  * 诊断快照附带 buildingType / year / area / province（计算当时的输入），
  * 结果展示只读快照，避免表单已切换类型而数字仍是旧类型的错位。
  * 监听 configStore：已有结果时，专家参数保存后自动重算（同模块② 联动模式）。
  */
-export default function DiagnosisResults({ onApply }) {
+export default function DiagnosisResults({ recs, onApply }) {
   const config = useConfigStore((s) => s.config)
   const diagnosis = useDiagnosisStore((s) => s.diagnosis)
   const isDiagnosisDone = useDiagnosisStore((s) => s.isDiagnosisDone)
@@ -48,23 +47,6 @@ export default function DiagnosisResults({ onApply }) {
     }
   }, [config, isDiagnosisDone])
 
-  // 推荐引擎：从诊断快照确定性派生（config 变化随诊断重算一并刷新）
-  const recs = useMemo(
-    () =>
-      diagnosis
-        ? buildRecommendations(
-            {
-              buildingNature: diagnosis.buildingNature ?? 'existing',
-              buildingType: diagnosis.buildingType,
-              area: diagnosis.area,
-              province: diagnosis.province,
-            },
-            config,
-          )
-        : [],
-    [diagnosis, config],
-  )
-
   if (!diagnosis) {
     return (
       <div className="mt-5 rounded-lg border border-dashed border-line p-4">
@@ -81,6 +63,8 @@ export default function DiagnosisResults({ onApply }) {
 
   const isNew = diagnosis.buildingNature === 'new'
   const recommendations = isNew ? [] : getRecommendations(diagnosis.buildingType, diagnosis.savingPotential)
+  const typeLabel =
+    benchmarkTypes.find((b) => b.key === diagnosis.buildingType)?.label ?? diagnosis.buildingType
 
   // 对比条：以 max(采用强度, 基准) 归一化；虚线=约束值，绿=基准内，amber=超基准部分。
   // 新建未填设计值时采用强度=约束值，条形无信息量，跳过
@@ -214,7 +198,7 @@ export default function DiagnosisResults({ onApply }) {
       {!isNew && (
         <div>
           <p className="mb-2 text-[11px] uppercase tracking-widest text-paper-mute">
-            建议措施（{diagnosis.buildingType}建筑）
+            建议措施（{typeLabel}）
           </p>
           <div className="flex flex-wrap gap-2">
             {recommendations.map((rec, i) => {
@@ -238,9 +222,8 @@ export default function DiagnosisResults({ onApply }) {
           )}
         </div>
       )}
-      {/* 方案配置推荐 + 投资价值热力图（两种建筑性质共用，确定性派生） */}
+      {/* 方案配置推荐（两种建筑性质共用，确定性派生；热力图由容器布局） */}
       <RecommendationList recs={recs} onApply={onApply} />
-      <ValueHeatmap recs={recs} />
     </div>
   )
 }

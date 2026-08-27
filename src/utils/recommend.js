@@ -18,6 +18,11 @@ import { calculateFeasibility } from './finance.js'
 const clamp = (v) => Math.min(100, Math.max(0, v))
 const round1 = (v) => Math.round(v * 10) / 10
 
+// 全天候平稳负荷类型：储能充放不受日间波谷限制，利用率加分（引擎逻辑常数）
+const STEADY_LOAD_TYPES = ['医院', '酒店', '数据中心']
+// 区域供冷适用性弱的类型：高校以分体空调为主、工业厂房属工艺冷特例，达标也只给低档分
+const COOLING_WEAK_TYPES = ['高校', '工业厂房']
+
 const levelOf = (score) => {
   const b = R.levelBuckets.values
   if (score >= b['推荐']) return '推荐'
@@ -74,15 +79,16 @@ export const buildRecommendations = (
   const strongSpread = spread >= R.storageStrongSpread.values
   const storageMwh = Math.max(R.storageMinMwh.values, round1(pvMw * R.storageToPvRatio.values))
   const storageScore = clamp(
-    Math.round((strongSpread ? 72 : 48) + (buildingType === '医院' ? 8 : 0)),
+    Math.round((strongSpread ? 72 : 48) + (STEADY_LOAD_TYPES.includes(buildingType) ? 8 : 0)),
   )
 
   // ── 集中供冷：类型冷负荷特征 + 面积经济门槛；新建规划期介入成本最低 ──
   const coolingMin = R.coolingMinArea.values[buildingType] ?? 50000
   const coolingFits = area >= coolingMin
-  const coolingScore = clamp(
-    Math.round((coolingFits ? (buildingType === '办公' ? 62 : 75) : 28) + (isNew && coolingFits ? 15 : 0)),
-  )
+  const coolingBase = coolingFits
+    ? (COOLING_WEAK_TYPES.includes(buildingType) ? 55 : buildingType === '办公' ? 62 : 75)
+    : 28
+  const coolingScore = clamp(Math.round(coolingBase + (isNew && coolingFits ? 15 : 0)))
   const coolingScale = round1(area / 1e4)
 
   // ── 充电桩：类型客流代理推断，车位未知 → 置信度如实降级为待确认 ──
@@ -119,7 +125,9 @@ export const buildRecommendations = (
         strongSpread
           ? '价差达到两充两放经济边界，优先级高'
           : '价差一般，收益依赖充放策略精细化',
-        ...(buildingType === '医院' ? ['医院 24h 负荷平稳，储能利用率高'] : []),
+        ...(STEADY_LOAD_TYPES.includes(buildingType)
+          ? [`${buildingType}全天负荷平稳，储能利用率高`]
+          : []),
         `规模按光储配比 1:${R.storageToPvRatio.values} 估算为 ${storageMwh} MWh，需负荷数据修正`,
       ],
       estimate: estimateOf('storage', storageMwh, province, config),

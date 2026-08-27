@@ -1,6 +1,7 @@
 import { Activity, Loader2 } from 'lucide-react'
 import Button from '../ui/Button'
-import { useDiagnosisStore, BUILDING_TYPES } from '../../stores/diagnosisStore'
+import { useDiagnosisStore } from '../../stores/diagnosisStore'
+import { benchmarkTypes } from '../../data/benchmarks.js'
 import { useConfigStore } from '../../stores/configStore'
 
 // 建造年份滑杆范围（UI 边界，非计算系数）
@@ -61,9 +62,9 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
             onChange={(e) => setInput({ buildingType: e.target.value })}
             className={inputClass}
           >
-            {BUILDING_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}建筑
+            {benchmarkTypes.map((t) => (
+              <option key={t.key} value={t.key}>
+                {t.label}
               </option>
             ))}
           </select>

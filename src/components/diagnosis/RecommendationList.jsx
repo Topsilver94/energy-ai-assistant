@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { ArrowDownToLine, X } from 'lucide-react'
+import { ArrowDownToLine } from 'lucide-react'
 import Button from '../ui/Button'
 
 // level 徽章：推荐=亮绿（选中态语义），可考虑=灰，谨慎=amber（唯一警示色），暂缓=灰弱
@@ -19,11 +18,11 @@ const CONFIDENCE = {
 
 /**
  * 方案配置推荐列表（规则引擎输出，每条附触发依据）。
- * 「填入模块② 测算」为覆盖式操作 → 两段式确认（首击变确认态，不用弹窗）：
- * 只写入 level 推荐/可考虑 的系统（见 projectStore.applyRecommendation）。
+ * 「填入模块② 测算」为覆盖式操作，只写入 level 推荐/可考虑 的系统
+ * （见 projectStore.applyRecommendation）。流程上诊断在前、测算页多为空/旧值，
+ * 误覆盖重建成本低，不设确认弹窗——单击即填入并跳转（演示模式 toast 反馈）。
  */
 export default function RecommendationList({ recs, onApply }) {
-  const [confirming, setConfirming] = useState(false)
   if (!recs || recs.length === 0) return null
 
   const adoptCount = recs.filter((r) => r.level === '推荐' || r.level === '可考虑').length
@@ -72,31 +71,12 @@ export default function RecommendationList({ recs, onApply }) {
         ))}
       </div>
 
-      {/* 两段式确认：首击 → 确认覆盖；再击 → 应用并回调（模块容器负责 toast） */}
-      <div className="mt-3 flex items-center justify-end gap-2">
-        {confirming && (
-          <Button variant="ghost" size="sm" onClick={() => setConfirming(false)}>
-            <X size={14} />
-            取消
-          </Button>
-        )}
-        {confirming ? (
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => {
-              setConfirming(false)
-              onApply(recs)
-            }}
-          >
-            确认覆盖当前选择？
-          </Button>
-        ) : (
-          <Button variant="primary" size="sm" onClick={() => setConfirming(true)}>
-            <ArrowDownToLine size={14} />
-            填入模块② 测算（{adoptCount} 项推荐）
-          </Button>
-        )}
+      {/* 单击即填入（覆盖式）：容器负责跳转 / toast 反馈 */}
+      <div className="mt-3 flex items-center justify-end">
+        <Button variant="primary" size="sm" onClick={() => onApply(recs)}>
+          <ArrowDownToLine size={14} />
+          填入模块② 测算（{adoptCount} 项推荐）
+        </Button>
       </div>
     </div>
   )

@@ -60,15 +60,14 @@ const log = (m) => {
     return hit.map((el) => el.textContent.replace(/\s+/g, ' ').trim())
   })
 
-  // ── 一键填入模块②（工作模式：确认后自动跳转测算页） ──
+  // ── 一键填入模块②（单击即填入，工作模式自动跳转测算页） ──
   const applyBtn = page.locator('button:has-text("填入模块② 测算")')
   report.extracted.applyBtnText = await applyBtn.textContent()
   await applyBtn.click()
-  await page.locator('button:has-text("确认覆盖当前选择？")').click()
   await page.waitForTimeout(400)
-  log('一键填入完成')
+  log('一键填入完成（单击，无确认弹窗）')
 
-  // 回模块② 验证表单状态（确认后工作模式已自动跳转到该页，此点击为幂等兜底）
+  // 回模块② 验证表单状态（填入后工作模式已自动跳转到该页，此点击为幂等兜底）
   await page.locator('nav[aria-label="模块导航"] button:has-text("锁定收益")').click()
   await page.waitForTimeout(300)
   report.extracted.calcAfterApply = await page.evaluate(() => {
@@ -114,6 +113,26 @@ const log = (m) => {
   )
   await page.screenshot({ path: path.join(shotDir, 'm2-04-new-blank.png'), fullPage: true })
   log('场景B-2 新建留空（按约束值预估）完成')
+
+  // ── 场景C：既有工业厂房（扩类型回归：基准80、大屋面光伏、措施文案、热力图位置） ──
+  await page.locator('button:has-text("既有建筑")').click()
+  await page.locator('select').first().selectOption('工业厂房')
+  await page.locator('input[placeholder="如 10000"]').fill('20000')
+  await page.locator('input[placeholder="如 80"]').fill('200')
+  await page.locator('button:has-text("开始诊断")').click()
+  await page.waitForTimeout(600)
+  report.extracted.industrial = await page.evaluate(() => {
+    const title = [...document.querySelectorAll('p')].find((p) => p.textContent.includes('建议措施'))
+    const chips = title?.parentElement.querySelectorAll('span.inline-flex') ?? []
+    return {
+      measuresTitle: title?.textContent.trim(),
+      chipCount: chips.length,
+      hasHeatmap: document.body.textContent.includes('投资价值热力图'),
+      hasPvHighScore: document.body.textContent.includes('分布式光伏'),
+    }
+  })
+  await page.screenshot({ path: path.join(shotDir, 'm2-05-industrial.png'), fullPage: true })
+  log('场景C 既有工业厂房诊断完成（新增类型回归）')
 
   await browser.close()
   fs.writeFileSync(path.join(outDir, 'm2.json'), JSON.stringify(report, null, 2))
