@@ -12,8 +12,8 @@ import { useAiStore } from '../../stores/aiStore'
  * 选中书签仅多探出 4px 并亮绿描边——绿色做指示不做铺色（§6 纪律）。
  */
 const STEPS = [
-  { key: 'calc', index: '01', label: '锁定收益', hint: '组合测算投资与收益' },
-  { key: 'diag', index: '02', label: '挖掘痛点', hint: '对标基准定位节能空间' },
+  { key: 'diag', index: '01', label: '挖掘痛点', hint: '对标基准定位节能空间' },
+  { key: 'calc', index: '02', label: '锁定收益', hint: '组合测算投资与收益' },
   { key: 'report', index: '03', label: '订制方案', hint: '汇总①②输出一页方案' },
 ]
 

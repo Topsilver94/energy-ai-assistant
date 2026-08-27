@@ -5,7 +5,7 @@ import { useDiagnosisStore } from '../../stores/diagnosisStore'
 import { useAiStore } from '../../stores/aiStore'
 
 /**
- * 底部进度状态条：三步闭环的实时状态（① 速算 → ② 诊断 → ③ 方案）
+ * 底部进度状态条：三步闭环的实时状态（① 诊断 → ② 测算 → ③ 方案）
  * 完成态 = 亮绿圆点 + 对勾；进度计数用等宽数字
  * 第三步完成 = 模块③ 已生成方案内容（aiStore.reportContent）
  */
@@ -15,8 +15,8 @@ export default function StepNav() {
   const isReportDone = useAiStore((s) => s.reportContent.length > 0)
 
   const steps = [
-    { label: '锁定收益', done: isFeasibleDone },
     { label: '挖掘痛点', done: isDiagnosisDone },
+    { label: '锁定收益', done: isFeasibleDone },
     { label: '订制方案', done: isReportDone },
   ]
   const doneCount = steps.filter((s) => s.done).length

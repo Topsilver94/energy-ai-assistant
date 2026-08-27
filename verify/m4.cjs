@@ -28,6 +28,8 @@ const log = (m) => {
   page.on('pageerror', (e) => report.pageErrors.push(String(e)))
 
   await page.goto(BASE, { waitUntil: 'networkidle' })
+  // 默认页为模块①诊断，先切模块②完成测算
+  await page.locator('nav[aria-label="模块导航"] button:has-text("锁定收益")').click()
 
   // ── 准备：完成①②（同 m3 场景：广东 光伏2MW+储能1MWh / 既有办公20000㎡电费200万） ──
   await page.locator('label:has-text("分布式光伏 规模") input').fill('2')

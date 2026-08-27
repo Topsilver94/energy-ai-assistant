@@ -61,8 +61,8 @@ const keyParams = (systems, config, province) => {
 }
 
 /**
- * @param {{ inputs: { province, systems }, feasibility: object }} project 模块① store 快照
- * @param {{ inputs: object, diagnosis: object }} diagnosis 模块② store 快照
+ * @param {{ inputs: { province, systems }, feasibility: object }} project 模块② store 快照
+ * @param {{ inputs: object, diagnosis: object }} diagnosis 模块① store 快照
  * @param {object} config configStore 纯数值配置
  * @returns {string} Markdown 方案文本
  * @throws 未选择任何系统时抛错（生成前应有测算结果兜底）
@@ -139,7 +139,7 @@ ${itemRows}
 
 ${sensLines}
 
-## 三、技术路径（${isNew ? '新建 · 一体化设计建议' : '模块② 诊断建议'}）
+## 三、技术路径（${isNew ? '新建 · 一体化设计建议' : '模块① 诊断建议'}）
 
 ${numberedMeasures || '—'}
 ${oldBuilding ? '\n> 注：建成年份 ≤ 2000 年，建议同步评估外窗与围护结构保温性能。\n' : ''}

@@ -13,7 +13,7 @@ import { calculateFeasibility } from '../../utils/finance'
 const MIN_LOADING_MS = 300
 
 /**
- * 模块① 锁定收益（可行性速算）：卡片外壳 + 表单 + 结果整合
+ * 模块② 锁定收益（可行性速算）：卡片外壳 + 表单 + 结果整合
  * 状态流：多选系统与规模 → projectStore.inputs.systems；
  * 测算 → calculateFeasibility → setFeasibility（isFeasibleDone 置 true，
  * 底部进度条与模块③依赖随之点亮）
@@ -81,7 +81,7 @@ export default function CalculatorModule({ wide = false }) {
           </span>
           <div>
             <p className="font-mono text-[11px] uppercase tracking-widest text-paper-mute">
-              Step 01
+              Step 02
             </p>
             <h3 className="text-lg font-bold">锁定收益</h3>
           </div>

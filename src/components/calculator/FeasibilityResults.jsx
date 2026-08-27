@@ -8,7 +8,7 @@ import { calculateFeasibility } from '../../utils/finance'
 import { buildSensitivity } from '../../utils/sensitivity'
 
 /**
- * 模块① 结果区（组合测算）：4 张组合总账数据卡 + 分项明细表
+ * 模块② 结果区（组合测算）：4 张组合总账数据卡 + 分项明细表
  *
  * 关键联动：监听 configStore，已有测算结果时，专家参数保存后自动按最新系数
  * 重算组合，无需再点「开始测算」。重算异常时保留旧结果（避免整树崩溃黑屏）。

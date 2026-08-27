@@ -1,4 +1,4 @@
-// 全链路验证脚本 · 模块① 锁定收益（工作模式默认页）
+// 全链路验证脚本 · 模块② 锁定收益（工作模式；默认页为模块①诊断，先经导航切页）
 // 运行：NODE_PATH=<npx缓存playwright> node verify/m1.cjs
 // 产出：verify/out/m1.json（控制台报错 + 抓取数值）+ verify/shots/*.png
 const { chromium } = require('playwright')
@@ -27,10 +27,11 @@ const log = (msg) => {
   })
   page.on('pageerror', (e) => report.pageErrors.push(String(e)))
 
-  // 1. 首屏加载
+  // 1. 首屏加载（默认页为模块①诊断）→ 切到模块②测算
   await page.goto(BASE, { waitUntil: 'networkidle' })
+  await page.locator('nav[aria-label="模块导航"] button:has-text("锁定收益")').click()
   await page.screenshot({ path: path.join(shotDir, 'm1-01-initial.png'), fullPage: true })
-  log('首屏加载完成（工作模式 · 模块①）')
+  log('首屏加载完成（默认页诊断 → 已切模块②）')
 
   // 2. 填入规模：光伏 2 MW（默认已选），再开储能并填 1 MWh，省份保持默认广东
   const pvInput = page.locator('label:has-text("分布式光伏 规模") input[type="number"]')

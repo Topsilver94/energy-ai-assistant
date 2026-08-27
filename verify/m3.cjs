@@ -1,6 +1,6 @@
 // 全链路验证脚本 · 模块③ 订制方案
 // 链路：锁定态 → 完成①② → 未填Key生成（本地模板降级+amber提示）→ localStorage 无Key泄漏
-//       → 填无效Key重生成（401 分型提示）→ 复制按钮 → 方案数字与模块①同源
+//       → 填无效Key重生成（401 分型提示）→ 复制按钮 → 方案数字与模块②同源
 const { chromium } = require('playwright')
 const fs = require('fs')
 const path = require('path')
@@ -42,7 +42,7 @@ const log = (m) => {
   await page.locator('label:has-text("储能 规模") input').fill('1')
   await page.locator('button:has-text("开始测算")').click()
   await page.locator('text=组合投资').first().waitFor({ timeout: 5000 })
-  log('模块① 完成')
+  log('模块② 完成')
 
   // ── 2. 完成②：既有办公 20000㎡ / 电费200万 ──
   await page.locator('nav[aria-label="模块导航"] button:has-text("挖掘痛点")').click()
@@ -50,7 +50,7 @@ const log = (m) => {
   await page.locator('input[placeholder="如 80"]').fill('200')
   await page.locator('button:has-text("开始诊断")').click()
   await page.locator('text=节能潜力').first().waitFor({ timeout: 5000 })
-  log('模块② 完成')
+  log('模块① 完成')
 
   // ── 3. 模块③：未填 Key 生成 → 本地模板降级 ──
   await page.locator('nav[aria-label="模块导航"] button:has-text("订制方案")').click()
@@ -62,7 +62,7 @@ const log = (m) => {
   await page.screenshot({ path: path.join(shotDir, 'm3-01-local-fallback.png'), fullPage: true })
   log('未填 Key → 本地模板降级 + amber 提示')
 
-  // 方案数字与模块① 同源抽查
+  // 方案数字与模块② 同源抽查
   const rt = report.extracted.reportText || ''
   report.extracted.numberCheck = {
     invest820: rt.includes('820.00'),

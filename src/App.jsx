@@ -9,13 +9,6 @@ import CalculatorModule from './components/calculator'
 import DiagnosisModule from './components/diagnosis'
 import AIReportPanel from './components/aiReport/AIReportPanel'
 
-/** 工作模式分页的三模块清单（key 与 WorkNav STEPS 对齐；wide = 横向双栏布局） */
-const MODULES = [
-  { key: 'calc', node: <CalculatorModule wide /> },
-  { key: 'diag', node: <DiagnosisModule wide /> },
-  { key: 'report', node: <AIReportPanel wide /> },
-]
-
 /**
  * 全局布局（双模式，右下角 ModeSwitch 切换）：
  *   工作模式（默认）左缘书签导航（悬浮展开）+ 内容分页居中，内部专注使用
@@ -29,9 +22,17 @@ export default function App() {
   const [drawer, setDrawer] = useState(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [mode, setMode] = useState('work')
-  const [activeKey, setActiveKey] = useState('calc')
+  const [activeKey, setActiveKey] = useState('diag')
 
-  const activeModule = MODULES.find((m) => m.key === activeKey) ?? MODULES[0]
+  // 工作模式分页清单（key 与 WorkNav STEPS 对齐；wide = 横向双栏布局）。
+  // 顺序即售前主线「先诊断后开方」：①诊断（默认入口）→ ②测算 → ③方案；
+  // 诊断页采纳推荐后经 onApplied 直接跳转测算页
+  const modules = [
+    { key: 'diag', node: <DiagnosisModule wide onApplied={() => setActiveKey('calc')} /> },
+    { key: 'calc', node: <CalculatorModule wide /> },
+    { key: 'report', node: <AIReportPanel wide /> },
+  ]
+  const activeModule = modules.find((m) => m.key === activeKey) ?? modules[0]
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -51,7 +52,7 @@ export default function App() {
         /* 演示模式：三列同屏全貌 */
         <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
           <section className="no-print mb-6">
-            <h2 className="text-2xl font-bold">锁定收益 · 挖掘痛点 · 订制方案，三步闭环</h2>
+            <h2 className="text-2xl font-bold">挖掘痛点 · 锁定收益 · 订制方案，三步闭环</h2>
             <p className="mt-1.5 text-sm leading-relaxed text-paper-mute">
               模块①② 的结构化结果将自动汇总给模块③，生成一页式节能改造方案；
               右上角「专家参数」可实时调整全部计算系数，保存后全局生效。
@@ -59,8 +60,8 @@ export default function App() {
           </section>
 
           <div className="grid gap-6 lg:grid-cols-3">
-            <CalculatorModule wide={false} />
             <DiagnosisModule wide={false} />
+            <CalculatorModule wide={false} />
             <AIReportPanel wide={false} />
           </div>
         </main>

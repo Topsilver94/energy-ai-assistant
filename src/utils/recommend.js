@@ -1,5 +1,5 @@
 /**
- * 方案配置推荐引擎（模块②）—— 确定性规则推导，非 AI 生成（同 phasing.js 定位）。
+ * 方案配置推荐引擎（模块①）—— 确定性规则推导，非 AI 生成（同 phasing.js 定位）。
  *
  * 职责：依据诊断输入（建筑性质/类型/面积/省份）给四类系统打分排序，
  * 输出 level / 触发依据 / 建议规模 / 置信度；财务预估值调 calculateFeasibility
@@ -69,7 +69,7 @@ export const buildRecommendations = (
     Math.round(40 + Math.min(50, (pvMw / R.pvFullScoreMw.values) * 50) + (isNew ? 5 : 0)),
   )
 
-  // ── 储能：峰谷价差 = 电价 × 套利系数（复用 STEP1 已有系数，零新增数据） ──
+  // ── 储能：峰谷价差 = 电价 × 套利系数（复用模块②已有系数，零新增数据） ──
   const spread = prov.elecPrice * config.storage.arbitrageRatio
   const strongSpread = spread >= R.storageStrongSpread.values
   const storageMwh = Math.max(R.storageMinMwh.values, round1(pvMw * R.storageToPvRatio.values))

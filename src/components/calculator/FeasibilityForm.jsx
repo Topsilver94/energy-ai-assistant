@@ -7,7 +7,7 @@ const inputClass =
   'w-full rounded-xl bg-ink-raised px-3 py-2.5 text-[15px] text-paper outline-none transition-shadow placeholder:text-paper-faint focus:ring-2 focus:ring-volt'
 
 /**
- * 模块① 输入表单（组合测算）：系统多选卡片 + 各选中系统规模 + 共用省份
+ * 模块② 输入表单（组合测算）：系统多选卡片 + 各选中系统规模 + 共用省份
  * 输入绑定 projectStore.inputs.systems；测算与校验逻辑在父级 index.jsx。
  * 选中态纪律（CLAUDE.md §6）：亮绿描边 + 对勾点缀，不大面积铺色。
  */

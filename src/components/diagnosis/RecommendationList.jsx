@@ -19,7 +19,7 @@ const CONFIDENCE = {
 
 /**
  * 方案配置推荐列表（规则引擎输出，每条附触发依据）。
- * 「填入 STEP1 测算」为覆盖式操作 → 两段式确认（首击变确认态，不用弹窗）：
+ * 「填入模块② 测算」为覆盖式操作 → 两段式确认（首击变确认态，不用弹窗）：
  * 只写入 level 推荐/可考虑 的系统（见 projectStore.applyRecommendation）。
  */
 export default function RecommendationList({ recs, onApply }) {
@@ -94,7 +94,7 @@ export default function RecommendationList({ recs, onApply }) {
         ) : (
           <Button variant="primary" size="sm" onClick={() => setConfirming(true)}>
             <ArrowDownToLine size={14} />
-            填入 STEP1 测算（{adoptCount} 项推荐）
+            填入模块② 测算（{adoptCount} 项推荐）
           </Button>
         )}
       </div>

@@ -1,4 +1,4 @@
-// 敏感性表（模块① 结果区）：数据全部来自 utils/sensitivity.js，纯展示、无 store
+// 敏感性表（模块② 结果区）：数据全部来自 utils/sensitivity.js，纯展示、无 store
 // 依赖（可独立 SSR 冒烟）。单元格两行制：主行 IRR，副行 回收期 + 相对基准偏差；
 // 偏差优 = volt / 劣 = amber（§6 唯一警示色），跌破折现率的 IRR 数值转 amber。
 const HEADERS = ['-20%', '-10%', '基准', '+10%', '+20%']

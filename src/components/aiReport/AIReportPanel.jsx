@@ -68,8 +68,8 @@ export default function AIReportPanel({ wide = false }) {
   useEffect(() => () => genController.current?.abort(), [])
 
   const deps = [
-    { label: 'Step 1 · 锁定收益', ok: isFeasibleDone },
-    { label: 'Step 2 · 挖掘痛点', ok: isDiagnosisDone },
+    { label: 'Step 1 · 挖掘痛点', ok: isDiagnosisDone },
+    { label: 'Step 2 · 锁定收益', ok: isFeasibleDone },
   ]
 
   // 提示拼接：上游 message 常以句号结尾（如「…请充值。」），直接接「，已回退」会叠标点，
@@ -169,7 +169,7 @@ export default function AIReportPanel({ wide = false }) {
               </div>
             ))}
             <p className="pt-1 text-[12px] text-paper-mute">
-              请先完成前两步（锁定收益 · 挖掘痛点）
+              请先完成前两步（挖掘痛点 · 锁定收益）
             </p>
           </div>
         </div>

@@ -11,9 +11,9 @@ const inputClass =
   'w-full rounded-xl bg-ink-raised px-3 py-2.5 text-[15px] text-paper outline-none transition-shadow placeholder:text-paper-faint focus:ring-2 focus:ring-volt'
 
 /**
- * 模块② 输入表单：建筑性质（既有/新建）+ 面积 / 类型 / 省份
+ * 模块① 输入表单：建筑性质（既有/新建）+ 面积 / 类型 / 省份
  * 既有另填：建造年份（滑杆）+ 年度电费；新建另填：设计能耗强度（可选，留空按约束值预估）
- * 省份用于读取分省电价（与模块①同一 config 数据源）
+ * 省份用于读取分省电价（与模块②同一 config 数据源）
  */
 export default function DiagnosisForm({ onSubmit, loading = false }) {
   const inputs = useDiagnosisStore((s) => s.inputs)

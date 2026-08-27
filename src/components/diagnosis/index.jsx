@@ -10,15 +10,16 @@ import { useConfigStore } from '../../stores/configStore'
 import { useProjectStore } from '../../stores/projectStore'
 import { calculateDiagnosis } from '../../utils/diagnosis'
 
-// 最短 loading 时长（UX 常数，防结果闪现，同模块①）
+// 最短 loading 时长（UX 常数，防结果闪现，同模块②）
 const MIN_LOADING_MS = 300
 
 /**
- * 模块② 挖掘痛点（能耗诊断）：卡片外壳 + 表单 + 结果整合
+ * 模块① 挖掘痛点（能耗诊断）：卡片外壳 + 表单 + 结果整合
  * 诊断快照附带计算时的 buildingType / year，供结果区与模块③ 稳定引用
- * wide（工作模式）：表单与结果左右双栏并排（同模块①），窄容器保持上下堆叠
+ * wide（工作模式）：表单与结果左右双栏并排（同模块②），窄容器保持上下堆叠
+ * onApplied：工作模式传入（填入推荐后跳转模块②测算页）；演示模式不传，用 toast 反馈
  */
-export default function DiagnosisModule({ wide = false }) {
+export default function DiagnosisModule({ wide = false, onApplied }) {
   const inputs = useDiagnosisStore((s) => s.inputs)
   const isDiagnosisDone = useDiagnosisStore((s) => s.isDiagnosisDone)
   const setDiagnosis = useDiagnosisStore((s) => s.setDiagnosis)
@@ -75,10 +76,12 @@ export default function DiagnosisModule({ wide = false }) {
     }, MIN_LOADING_MS)
   }
 
-  // 采纳推荐 → 覆盖式写入 STEP1（推荐列表内部已做两段式确认），此处只负责反馈
+  // 采纳推荐 → 覆盖式写入模块②测算（推荐列表内部已做两段式确认）。
+  // 工作模式填完即跳测算页（表单已填状态即反馈）；演示模式三列同屏，用 toast 提示
   const handleApply = (recs) => {
     applyRecommendation(recs)
-    showToast('已填入 STEP1 推荐组合，可调整规模后开始测算')
+    if (onApplied) onApplied()
+    else showToast('已填入模块②推荐组合，可调整规模后开始测算')
   }
 
   return (
@@ -90,7 +93,7 @@ export default function DiagnosisModule({ wide = false }) {
           </span>
           <div>
             <p className="font-mono text-[11px] uppercase tracking-widest text-paper-mute">
-              Step 02
+              Step 01
             </p>
             <h3 className="text-lg font-bold">挖掘痛点</h3>
           </div>

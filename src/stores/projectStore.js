@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-// 模块① 系统类型枚举：与 config 系数分组一一对应（组合四项，多选）；
+// 模块② 系统类型枚举：与 config 系数分组一一对应（组合四项，多选）；
 // scaleUnit 用于各系统规模输入框的动态单位标签与占位提示
 export const PROJECT_TYPES = [
   { key: 'pv', label: '分布式光伏', scaleUnit: 'MW', placeholder: '如 2' },
@@ -10,7 +10,7 @@ export const PROJECT_TYPES = [
 ]
 
 /**
- * 模块① 锁定收益（可行性速算 · 组合测算）
+ * 模块② 锁定收益（可行性速算 · 组合测算）
  *
  * inputs.systems 为各系统的开关 + 规模；省份共用一个（电价/利用小时同源）。
  * feasibility: { province, items: [...分项], total: {...组合总账} } | null，
@@ -49,7 +49,7 @@ export const useProjectStore = create((set) => ({
       },
     })),
   setFeasibility: (result) => set({ feasibility: result, isFeasibleDone: true }),
-  // 一键采纳模块② 推荐组合：仅启用 level 为「推荐/可考虑」的系统并填入建议规模，
+  // 一键采纳模块① 推荐组合：仅启用 level 为「推荐/可考虑」的系统并填入建议规模，
   // 谨慎/暂缓项关闭；未采纳项保留原规模。覆盖语义——UI 侧已做两段式确认
   applyRecommendation: (recs) =>
     set((s) => ({

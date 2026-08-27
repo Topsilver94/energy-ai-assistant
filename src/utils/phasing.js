@@ -2,7 +2,7 @@
  * 建设节奏建议（模块③ 方案章节之一）—— 确定性派生，非 AI 生成。
  *
  * 定位：帮客户决定「先建什么、后建什么」的是测算数字本身，不是模型措辞。
- * 本函数从模块① 组合测算结果推导分期，供本地模板（report.js）与 GLM-5
+ * 本函数从模块② 组合测算结果推导分期，供本地模板（report.js）与 GLM-5
  * Prompt（glm.js）共用；AI 仅润色措辞，分期结论与数字以本函数输出为准。
  *
  * 分期规则（零阈值常数、全部自参照，不引入任何可调系数）：
@@ -24,8 +24,8 @@ const systemName = (it) => {
 }
 
 /**
- * @param {Array} items 模块① feasibility.items（含 paybackPeriod / totalInvestment）
- * @param {object} total 模块① feasibility.total（含 paybackPeriod）
+ * @param {Array} items 模块② feasibility.items（含 paybackPeriod / totalInvestment）
+ * @param {object} total 模块② feasibility.total（含 paybackPeriod）
  * @returns {{ single: boolean, lines: string[] } | null} 展示行数组；无分项时 null
  */
 export const buildPhasing = (items, total) => {

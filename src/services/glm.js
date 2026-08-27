@@ -23,8 +23,8 @@ const fmt = (n, digits = 1) => Number(n).toFixed(digits)
 
 /**
  * 拼装对话消息（组合测算版）。
- * @param {{ inputs: { province, systems }, feasibility: object }} project 模块① 快照
- * @param {{ inputs: object, diagnosis: object }} diagnosis 模块② 快照（含 buildingType/year）
+ * @param {{ inputs: { province, systems }, feasibility: object }} project 模块② 快照
+ * @param {{ inputs: object, diagnosis: object }} diagnosis 模块① 快照（含 buildingType/year）
  * @param {object} config configStore 纯数值配置（系数快照整包注入，仅供合理性推断）
  */
 export const buildPrompt = (project, diagnosis, config) => {

@@ -21,12 +21,12 @@ const RATING_TONES = {
 const OLD_BUILDING_YEAR = 2000
 
 /**
- * 模块② 结果区：指标摘要 + 基准对比条 + 结论卡（既有=节能潜力/评级；新建=设计校核）
+ * 模块① 结果区：指标摘要 + 基准对比条 + 结论卡（既有=节能潜力/评级；新建=设计校核）
  * + 措施 Chips（既有）+ 方案配置推荐 + 投资价值热力图
  *
  * 诊断快照附带 buildingType / year / area / province（计算当时的输入），
  * 结果展示只读快照，避免表单已切换类型而数字仍是旧类型的错位。
- * 监听 configStore：已有结果时，专家参数保存后自动重算（同模块① 联动模式）。
+ * 监听 configStore：已有结果时，专家参数保存后自动重算（同模块② 联动模式）。
  */
 export default function DiagnosisResults({ onApply }) {
   const config = useConfigStore((s) => s.config)
