@@ -3,7 +3,8 @@
  *
  * 方法论：固定其他参数，对单一变量按 ±10% / ±20% 档位扰动，每档完整重跑
  * calculateFeasibility（含合并现金流 IRR / 静态回收期），检验结论稳健性。
- *   - 电价：光伏收益与储能套利同向，集中供冷购电成本反向（交叉效应如实呈现）
+ *   - 电价：光伏收益同向，集中供冷购电成本反向（交叉效应如实呈现）
+ *   - 峰谷价差：仅影响储能套利收益（独立公开数据项，与电价轴解耦）
  *   - 利用小时：仅影响光伏发电量
  *   - 整体造价：四系统 capex 同比例变动（可研评审最常问的一轴）
  * 对当前组合无影响的轴（如未选光伏时的利用小时）判定为平坦轴，跳过展示并注明。
@@ -50,6 +51,12 @@ const AXES = [
     label: '电价',
     note: '同向收益 · 反向成本',
     perturb: (config, province, f) => perturbProvince(config, province, { elecPrice: 1 + f }),
+  },
+  {
+    key: 'peakValleySpread',
+    label: '峰谷价差',
+    note: '仅影响储能',
+    perturb: (config, province, f) => perturbProvince(config, province, { peakValleySpread: 1 + f }),
   },
   {
     key: 'sunHours',

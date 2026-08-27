@@ -74,8 +74,8 @@ export const buildRecommendations = (
     Math.round(40 + Math.min(50, (pvMw / R.pvFullScoreMw.values) * 50) + (isNew ? 5 : 0)),
   )
 
-  // ── 储能：峰谷价差 = 电价 × 套利系数（复用模块②已有系数，零新增数据） ──
-  const spread = prov.elecPrice * config.storage.arbitrageRatio
+  // ── 储能：峰谷价差直读分省公开数据（2026年8月代理购电，取单一制与两部制较高档） ──
+  const spread = prov.peakValleySpread
   const strongSpread = spread >= R.storageStrongSpread.values
   const storageMwh = Math.max(R.storageMinMwh.values, round1(pvMw * R.storageToPvRatio.values))
   const storageScore = clamp(
@@ -121,7 +121,7 @@ export const buildRecommendations = (
       suggestedScale: storageMwh,
       confidence: 'medium',
       reasons: [
-        `预计峰谷价差约 ${spread.toFixed(2)} 元/kWh（电价 ${prov.elecPrice} × 套利系数 ${config.storage.arbitrageRatio}）`,
+        `当地一般工商业峰谷价差 ${spread.toFixed(2)} 元/kWh（2026年8月代理购电口径）`,
         strongSpread
           ? '价差达到两充两放经济边界，优先级高'
           : '价差一般，收益依赖充放策略精细化',

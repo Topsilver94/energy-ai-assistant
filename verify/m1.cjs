@@ -69,7 +69,7 @@ const log = (msg) => {
   report.extracted.sensitivity = await page.evaluate(() => {
     const out = []
     // 敏感性表区域：含「单变量扰动」标题之后的网格；按行结构抓
-    const blocks = [...document.querySelectorAll('.grid.grid-cols-\\[88px_repeat')]
+    const blocks = [...document.querySelectorAll('.grid.grid-cols-\\[88px_repeat\\(5\\,minmax\\(0\\,1fr\\)\\)\\]')]
     for (const row of blocks.slice(1)) {
       // slice(1) 跳过表头行
       const cells = [...row.children].map((c) => c.textContent.trim().replace(/\s+/g, ' '))

@@ -1,7 +1,8 @@
 // 全链路验证脚本 · 模块① 挖掘痛点（工作模式，经 WorkNav 切页）
 // 场景A 既有办公：20000㎡ · 2010年 · 年电费200万 · 广东
-//   预期：强度133.3 / 潜力32.5% / 评级需改进 / 推荐分 Pv60(可考虑,0.8MW) 储48 谨慎(0.5MWh) 桩45(8桩) 冷28
-//   一键填入 → 模块② 表单变为 pv=0.8 启用、其余关闭
+//   预期：强度133.3 / 潜力32.5% / 评级需改进 / 推荐分 储72(可考虑,0.5MWh) Pv60(可考虑,0.8MW) 桩45(8桩) 冷28
+//         （储能按广东 2026年8月 实际峰谷价差 1.2655 元/kWh 判定，升至可考虑档并居首）
+//   一键填入 → 模块② 表单变为 pv=0.8 与 storage=0.5 启用（可考虑档全采纳）、其余关闭
 // 场景B 新建办公：20000㎡ · 设计强度100（> 约束90 → 超标）；再测留空（按约束值预估）
 //   预期：不输出节能潜力
 const { chromium } = require('playwright')
@@ -47,9 +48,9 @@ const log = (m) => {
     }),
   )
 
-  // 推荐列表：每条卡片整段文本
+  // 推荐列表：每条卡片标题（text-sm font-semibold 类名齐全的标题元素）
   report.extracted.recommendations = await page.evaluate(() => {
-    const items = [...document.querySelectorAll('text-sm font-semibold')].map((h) => h.textContent.trim())
+    const items = [...document.querySelectorAll('.text-sm.font-semibold')].map((h) => h.textContent.trim())
     return items
   })
 

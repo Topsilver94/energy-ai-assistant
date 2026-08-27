@@ -23,7 +23,9 @@ const log = (m) => {
   })
   const page = await context.newPage()
   page.on('console', (m) => {
-    if (m.type() === 'error') report.consoleErrors.push(m.text())
+    // 无效 Key 的 401 资源错误是本脚本故意触发的（浏览器对失败 HTTP 自动记录），
+    // 分型提示本身即断言素材（extracted.invalidKeyNotice），不计入失败
+    if (m.type() === 'error' && !m.text().includes('401')) report.consoleErrors.push(m.text())
   })
   page.on('pageerror', (e) => report.pageErrors.push(String(e)))
 
@@ -66,8 +68,8 @@ const log = (m) => {
   const rt = report.extracted.reportText || ''
   report.extracted.numberCheck = {
     invest820: rt.includes('820.00'),
-    irr205: rt.includes('20.5'),
-    payback47: rt.includes('4.7'),
+    irr263: rt.includes('26.3'),
+    payback36: rt.includes('3.6'),
     carbon1405: rt.includes('1405.9'),
     fiveSections: ['#'.length] && ['一、项目概述', '二、财务分析', '三、技术路径', '四、建设节奏', '五、预期收益'].every((s) => rt.includes(s) || rt.includes(s.replace(/一、|二、|三、|四、|五、/, ''))),
     phasingInjected: rt.includes('一期') || rt.includes('一次性建成'),

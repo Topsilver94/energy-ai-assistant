@@ -16,11 +16,10 @@ export const defaultConfig = {
     omRatioPerYear: 0.01, // 年运维费占初始投资比例
     lifetimeYears: 25, // 计算期，组件功率质保 25 年
   },
-  // 储能（规模单位：MWh）
+  // 储能（规模单位：MWh）；套利收益按分省峰谷价差直接计（provinces.X.peakValleySpread，公开数据项）
   storage: {
     capexPerKWh: 1200, // 元/kWh，即 1.2 元/Wh
     cyclesPerDay: 2, // 两充两放，峰谷套利典型策略
-    arbitrageRatio: 0.8, // 峰谷价差 ≈ 当地电价 × 该系数
     omRatioPerYear: 0.02,
     lifetimeYears: 10, // 电芯质保 typical 10 年
   },
@@ -44,41 +43,44 @@ export const defaultConfig = {
     omRatioPerYear: 0.01, // 设备运维占初始投资比例
     lifetimeYears: 8, // 充电设备迭代快，按 8 年
   },
-  // 分省参数：年等效利用小时 + 工商业电价（面板按省分条列出）。
+  // 分省参数：年等效利用小时 + 工商业电价 + 峰谷价差（面板按省分条列出）。
   // 覆盖大陆 31 个省级单位（22 省 + 5 自治区 + 4 直辖市），按华北→东北→华东→华中→华南→西南→西北排列；
-  // 省内价区差异（如深圳 vs 广东其余、蒙西 vs 蒙东）不建模，取省量级，用户可在公开数据抽屉按项目地微调
+  // 省内价区差异（如深圳 vs 广东其余、蒙西 vs 蒙东）不建模，取省量级，用户可在公开数据抽屉按项目地微调。
+  // peakValleySpread 为真实数据：2026年8月电网代理购电（一般工商业 1-10kV）峰谷价差，
+  // 取单一制与两部制标准档较高者、不含 1.5 倍上浮档（省内多价区如广东取珠三角五市档）；
+  // 未收录的 6 省按演示假设值兜底——来源见下方 SPREAD_SOURCE / SPREAD_FALLBACK_SOURCE
   provinces: {
-    北京: { sunHours: 1200, elecPrice: 0.8 },
-    天津: { sunHours: 1200, elecPrice: 0.78 },
-    上海: { sunHours: 1050, elecPrice: 0.85 },
-    重庆: { sunHours: 850, elecPrice: 0.68 },
-    河北: { sunHours: 1300, elecPrice: 0.65 },
-    山西: { sunHours: 1350, elecPrice: 0.55 },
-    内蒙古: { sunHours: 1550, elecPrice: 0.5 },
-    辽宁: { sunHours: 1250, elecPrice: 0.65 },
-    吉林: { sunHours: 1300, elecPrice: 0.62 },
-    黑龙江: { sunHours: 1300, elecPrice: 0.6 },
-    江苏: { sunHours: 1100, elecPrice: 0.82 },
-    浙江: { sunHours: 1050, elecPrice: 0.85 },
-    安徽: { sunHours: 1100, elecPrice: 0.7 },
-    福建: { sunHours: 1150, elecPrice: 0.68 },
-    江西: { sunHours: 1100, elecPrice: 0.7 },
-    山东: { sunHours: 1250, elecPrice: 0.7 },
-    河南: { sunHours: 1200, elecPrice: 0.68 },
-    湖北: { sunHours: 1050, elecPrice: 0.72 },
-    湖南: { sunHours: 1000, elecPrice: 0.72 },
-    广东: { sunHours: 1050, elecPrice: 0.75 },
-    广西: { sunHours: 1100, elecPrice: 0.65 },
-    海南: { sunHours: 1250, elecPrice: 0.8 },
-    四川: { sunHours: 850, elecPrice: 0.65 },
-    贵州: { sunHours: 950, elecPrice: 0.6 },
-    云南: { sunHours: 1400, elecPrice: 0.55 },
-    西藏: { sunHours: 1900, elecPrice: 0.55 },
-    陕西: { sunHours: 1300, elecPrice: 0.6 },
-    甘肃: { sunHours: 1500, elecPrice: 0.5 },
-    青海: { sunHours: 1650, elecPrice: 0.45 },
-    宁夏: { sunHours: 1550, elecPrice: 0.45 },
-    新疆: { sunHours: 1500, elecPrice: 0.45 },
+    北京: { sunHours: 1200, elecPrice: 0.8, peakValleySpread: 0.7248 },
+    天津: { sunHours: 1200, elecPrice: 0.78, peakValleySpread: 0.8378 },
+    上海: { sunHours: 1050, elecPrice: 0.85, peakValleySpread: 1.0937 },
+    重庆: { sunHours: 850, elecPrice: 0.68, peakValleySpread: 1.0816 },
+    河北: { sunHours: 1300, elecPrice: 0.65, peakValleySpread: 0.75 }, // 冀北 0.7175，取南网主体档
+    山西: { sunHours: 1350, elecPrice: 0.55, peakValleySpread: 0.4638 },
+    内蒙古: { sunHours: 1550, elecPrice: 0.5, peakValleySpread: 0.4676 }, // 蒙东档
+    辽宁: { sunHours: 1250, elecPrice: 0.65, peakValleySpread: 0.4352 },
+    吉林: { sunHours: 1300, elecPrice: 0.62, peakValleySpread: 0.6 }, // 演示假设值兜底
+    黑龙江: { sunHours: 1300, elecPrice: 0.6, peakValleySpread: 0.3071 },
+    江苏: { sunHours: 1100, elecPrice: 0.82, peakValleySpread: 0.6476 }, // 100kVA 及以上档
+    浙江: { sunHours: 1050, elecPrice: 0.85, peakValleySpread: 0.7849 },
+    安徽: { sunHours: 1100, elecPrice: 0.7, peakValleySpread: 0.8167 }, // 两部制档
+    福建: { sunHours: 1150, elecPrice: 0.68, peakValleySpread: 0.5379 },
+    江西: { sunHours: 1100, elecPrice: 0.7, peakValleySpread: 0.6134 },
+    山东: { sunHours: 1250, elecPrice: 0.7, peakValleySpread: 0.846 }, // 四档同值
+    河南: { sunHours: 1200, elecPrice: 0.68, peakValleySpread: 0.6 }, // 演示假设值兜底
+    湖北: { sunHours: 1050, elecPrice: 0.72, peakValleySpread: 0.5898 },
+    湖南: { sunHours: 1000, elecPrice: 0.72, peakValleySpread: 0.6 }, // 演示假设值兜底
+    广东: { sunHours: 1050, elecPrice: 0.75, peakValleySpread: 1.2655 }, // 珠三角五市档
+    广西: { sunHours: 1100, elecPrice: 0.65, peakValleySpread: 0.3629 },
+    海南: { sunHours: 1250, elecPrice: 0.8, peakValleySpread: 0.6 }, // 演示假设值兜底
+    四川: { sunHours: 850, elecPrice: 0.65, peakValleySpread: 0.631 }, // 两部制档
+    贵州: { sunHours: 950, elecPrice: 0.6, peakValleySpread: 0.7053 }, // 两部制档
+    云南: { sunHours: 1400, elecPrice: 0.55, peakValleySpread: 0.6 }, // 演示假设值兜底
+    西藏: { sunHours: 1900, elecPrice: 0.55, peakValleySpread: 0.6 }, // 演示假设值兜底
+    陕西: { sunHours: 1300, elecPrice: 0.6, peakValleySpread: 0.7315 }, // 两部制档，含/不含榆林同值
+    甘肃: { sunHours: 1500, elecPrice: 0.5, peakValleySpread: 0.1461 }, // 全国最低
+    青海: { sunHours: 1650, elecPrice: 0.45, peakValleySpread: 0.2818 },
+    宁夏: { sunHours: 1550, elecPrice: 0.45, peakValleySpread: 0.1557 },
+    新疆: { sunHours: 1500, elecPrice: 0.45, peakValleySpread: 0.2568 },
   },
   // 通用系数
   general: {
@@ -91,17 +93,26 @@ export const defaultConfig = {
 const PROVINCE_SOURCE =
   '演示假设值：利用小时参考中国气象局太阳能资源区划典型区间；电价参考 2024–2025 各省工商业购电大致水平'
 
+// 分省峰谷价差来源（真实数据，独立公开数据项）：储能头条/国际能源网按月汇总自国网、南网分省公告
+const SPREAD_SOURCE =
+  '储能头条/国际能源网《2026年8月电网代理购电价格》：一般工商业 1-10kV，取单一制与两部制标准档较高者（不含 1.5 倍上浮档）'
+// 该月表未收录的省份 → 演示假设值兜底（红线：不编造数据），后续月度表出数后替换
+const SPREAD_MISSING = new Set(['吉林', '河南', '湖南', '海南', '云南', '西藏'])
+const SPREAD_FALLBACK_SOURCE =
+  '演示假设值：2026年8月代理购电表未收录该省，暂按已收录 25 省中位水平取整 0.60 元/kWh 兜底'
+
 // 年运维比例 / 计算期的统一来源说明
 const OM_SOURCE = '演示假设值：年运维费占初始投资比例，按行业运维报价量级'
 const LIFE_SOURCE = (years, basis) => `演示假设值：计算期 ${years} 年（${basis}）`
 
-// 分省参数面板区（scope: public）：按「利用小时 / 电价」拆两组，组内字段标签只留省名
-const provinceField = (prov, key, unit, step) => ({
+// 分省参数面板区（scope: public）：按「利用小时 / 电价 / 峰谷价差」拆组，组内字段标签只留省名；
+// source 可按字段覆盖（峰谷价差的兜底省单独标注，不与真实数据混淆）
+const provinceField = (prov, key, unit, step, source) => ({
   path: `provinces.${prov}.${key}`,
   label: prov,
   unit,
   step,
-  source: PROVINCE_SOURCE,
+  source: source ?? PROVINCE_SOURCE,
 })
 
 const provinceSections = [
@@ -116,9 +127,23 @@ const provinceSections = [
   {
     scope: 'public',
     title: '分省工商业电价',
-    hint: '各省工商业购电价格，影响发电收益 / 购电成本 / 储能套利测算',
+    hint: '各省工商业购电价格，影响发电收益 / 购电成本测算',
     fields: Object.keys(defaultConfig.provinces).map((prov) =>
       provinceField(prov, 'elecPrice', '元/kWh', 0.01),
+    ),
+  },
+  {
+    scope: 'public',
+    title: '分省峰谷价差',
+    hint: '一般工商业 1-10kV 峰谷价差（2026年8月代理购电），直接决定储能套利收益',
+    fields: Object.keys(defaultConfig.provinces).map((prov) =>
+      provinceField(
+        prov,
+        'peakValleySpread',
+        '元/kWh',
+        0.01,
+        SPREAD_MISSING.has(prov) ? SPREAD_FALLBACK_SOURCE : SPREAD_SOURCE,
+      ),
     ),
   },
 ]
@@ -177,13 +202,6 @@ export const coefficientSections = [
         unit: '次/天',
         step: 1,
         source: '行业惯例：两充两放（峰谷套利典型运行策略）',
-      },
-      {
-        path: 'storage.arbitrageRatio',
-        label: '峰谷价差系数（小数）',
-        unit: '',
-        step: 0.01,
-        source: '演示假设值：平均峰谷价差 ≈ 当地电价 × 0.8',
       },
       {
         path: 'storage.omRatioPerYear',

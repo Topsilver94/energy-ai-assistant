@@ -93,8 +93,8 @@ const log = (m) => {
     fiveSections: ['项目概述', '财务分析', '技术路径', '建设节奏', '预期收益'].every((s) => rt.includes(s)),
     numbersKept: {
       invest820: rt.includes('820'),
-      irr205: rt.includes('20.5'),
-      payback47: rt.includes('4.7'),
+      irr263: rt.includes('26.3'),
+      payback36: rt.includes('3.6'),
       carbon1405: rt.includes('1405.9') || rt.includes('1405'),
     },
     phasingKept: rt.includes('一期') || rt.includes('一次性建成'),
