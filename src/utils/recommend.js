@@ -63,13 +63,14 @@ const estimateOf = (key, scale, province, config) => {
 }
 
 /**
- * @param {{ buildingNature?: 'existing'|'new', buildingType: string, area: number|string, province: string }} params
+ * @param {{ buildingNature?: 'existing'|'new', buildingType: string, area: number|string,
+ *            province: string, roofType?: string }} params
  * @param {object} config configStore 纯数值配置
  * @returns {Array<{ key, label, scaleUnit, score, level, reasons: string[], suggestedScale,
  *            confidence: 'high'|'medium'|'verify', estimate: object|null }>} 按 score 降序
  */
 export const buildRecommendations = (
-  { buildingNature = 'existing', buildingType, area: rawArea, province },
+  { buildingNature = 'existing', buildingType, area: rawArea, province, roofType: rawRoof },
   config,
 ) => {
   const area = Number(rawArea)
@@ -77,13 +78,36 @@ export const buildRecommendations = (
   const prov = config.provinces[province] ?? Object.values(config.provinces)[0]
   const isNew = buildingNature === 'new'
 
-  // ── 光伏：屋顶可用面积推导（高层系数低、低层大屋面系数高）；规模口径 kW（备案/并网通行） ──
-  const roofRatio = R.roofUsableRatio.values[buildingType] ?? 0.4
+  // ── 光伏：屋面条件推导——既有按屋面类型（平/坡/彩钢，未选按类型典型值），
+  //    新建不问屋面（设计未定）直接按 BIPV 一体化满铺口径；规模 kW（备案/并网通行） ──
+  const typeRatio = R.roofUsableRatio.values[buildingType] ?? 0.4
+  let roofRatio
+  let roofDensity
+  let roofLabel
+  let roofNote = null
+  if (isNew) {
+    roofRatio = typeRatio * R.bipv.values.ratioFactor
+    roofDensity = R.bipv.values.kwPerSqm
+    roofLabel = 'BIPV 满铺'
+  } else {
+    const roofType = rawRoof || R.typicalRoof.values[buildingType] || '平屋面'
+    const cfg = R.roofTypes.values[roofType] ?? R.roofTypes.values.平屋面
+    roofRatio = typeRatio * cfg.ratioFactor
+    roofDensity = cfg.kwPerSqm
+    roofLabel = roofType
+    roofNote =
+      roofType === '坡屋面'
+        ? '坡屋面顺坡满铺，需校核坡面朝向与防水节点，单位造价高于平屋面支架式'
+        : roofType === '彩钢屋面'
+          ? '彩钢屋面夹具直贴、安装成本最低，需复核板型厚度与屋面荷载'
+          : null
+  }
   const roofArea = Math.round(area * roofRatio)
-  const pvKw = Math.max(R.pvMinKw.values, Math.round(roofArea * R.pvKwPerSqm.values))
+  const pvKw = Math.max(R.pvMinKw.values, Math.round(roofArea * roofDensity))
   const pvScore = clamp(
     Math.round(40 + Math.min(50, (pvKw / R.pvFullScoreKw.values) * 50) + (isNew ? 5 : 0)),
   )
+  const roofRatioText = Math.round(roofRatio * 100) / 100
 
   // ── 储能：峰谷价差直读分省公开数据（2026年8月代理购电，取单一制与两部制较高档） ──
   const spread = prov.peakValleySpread
@@ -120,9 +144,15 @@ export const buildRecommendations = (
       suggestedScale: pvKw,
       confidence: 'high',
       reasons: [
-        `可用屋顶约 ${roofArea} ㎡（${buildingType}建筑可用系数 ${roofRatio}）`,
-        `按 ${R.pvKwPerSqm.values} kW/㎡ 装机密度 → 建议约 ${pvKw} kW`,
-        ...(isNew ? ['新建可按 BIPV 一体化设计，屋面与结构成本摊薄'] : []),
+        `可用屋顶约 ${roofArea} ㎡（${buildingType}·${roofLabel}，可用系数 ${roofRatioText}）`,
+        `按 ${roofDensity} kW/㎡ 装机密度 → 建议约 ${pvKw} kW`,
+        ...(isNew
+          ? [
+              `新建按 BIPV 一体化满铺测算（覆盖率 ${R.bipv.values.ratioFactor} · 密度 ${R.bipv.values.kwPerSqm} kW/㎡），屋面即组件、增量成本低于既有加装`,
+            ]
+          : roofNote
+            ? [roofNote]
+            : []),
       ],
       estimate: estimateOf('pv', pvKw, province, config),
     },

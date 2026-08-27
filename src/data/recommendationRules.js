@@ -11,9 +11,23 @@ export const recommendationRules = {
     values: { 办公: 0.4, 商场: 0.5, 医院: 0.35, 酒店: 0.3, 高校: 0.45, 数据中心: 0.3, 工业厂房: 0.65 },
     source: '演示假设值：屋顶可用面积占建筑面积比例（低层大屋面商场高于高层办公/医院）',
   },
-  pvKwPerSqm: {
-    values: 0.1,
-    source: '演示假设值：屋顶光伏装机密度 0.1 kW/㎡（组件 + 检修通道综合）',
+  roofTypes: {
+    values: {
+      平屋面: { ratioFactor: 1.0, kwPerSqm: 0.1 },
+      坡屋面: { ratioFactor: 0.7, kwPerSqm: 0.13 },
+      彩钢屋面: { ratioFactor: 1.0, kwPerSqm: 0.12 },
+    },
+    source:
+      '演示假设值：屋面类型对光伏可用比例与装机密度的影响（平屋面支架阵列留检修间距；坡屋面顺坡满铺密度高但仅计有效朝向坡面；彩钢夹具直贴），量级参考分布式设计手册典型区间',
+  },
+  typicalRoof: {
+    values: { 办公: '平屋面', 商场: '平屋面', 医院: '平屋面', 酒店: '平屋面', 高校: '平屋面', 数据中心: '平屋面', 工业厂房: '彩钢屋面' },
+    source: '演示假设值：各建筑类型主流屋面形态（表单预选默认，可按项目实际修改）',
+  },
+  bipv: {
+    values: { ratioFactor: 0.9, kwPerSqm: 0.14 },
+    source:
+      '演示假设值：新建 BIPV 一体化满铺口径（屋面即组件，覆盖率与装机密度均高于支架式加装，增量成本低于既有加装）',
   },
   pvFullScoreKw: {
     values: 2000,

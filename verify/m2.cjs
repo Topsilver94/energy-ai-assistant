@@ -7,6 +7,7 @@
 //   预期：不输出节能潜力
 // 场景D 既有商场 20000㎡：集中供冷双口径回归
 //   预期：占比0.9 → 供冷面积1.8万㎡ · 折算设计冷负荷2520kW（负荷指标140 W/㎡）
+// 场景E 屋面类型分支：既有办公·坡屋面 → 728kW；新建办公 → BIPV满铺 1008kW（平屋面典型=场景A 800kW）
 const { chromium } = require('playwright')
 const fs = require('fs')
 const path = require('path')
@@ -152,6 +153,34 @@ const log = (m) => {
   }
   await page.screenshot({ path: path.join(shotDir, 'm2-06-mall-cooling.png'), fullPage: true })
   log('场景D 既有商场双口径诊断完成')
+
+  // ── 场景E：屋面类型分支（坡屋面打折 + 新建 BIPV 满铺） ──
+  await page.locator('button:has-text("既有建筑")').click()
+  await page.locator('select').first().selectOption('办公')
+  await page.locator('select').nth(2).selectOption('坡屋面')
+  await page.locator('button:has-text("开始诊断")').click()
+  await page.waitForTimeout(600)
+  report.extracted.roofSlope = await page.evaluate(() => {
+    const body = document.body.textContent.replace(/\s+/g, ' ')
+    return {
+      has728Kw: body.includes('建议约 728 kW'),
+      hasSlopeNote: body.includes('坡屋面顺坡满铺'),
+    }
+  })
+  await page.locator('button:has-text("新建建筑")').click()
+  await page.locator('select').first().selectOption('办公')
+  await page.locator('button:has-text("开始诊断")').click()
+  await page.waitForTimeout(600)
+  report.extracted.roofBipv = await page.evaluate(() => {
+    const body = document.body.textContent.replace(/\s+/g, ' ')
+    return {
+      has1008Kw: body.includes('建议约 1008 kW'),
+      hasBipvNote: body.includes('新建按 BIPV 一体化满铺测算'),
+      noRoofSelect: document.querySelectorAll('select').length === 2, // 仅 类型 + 省份
+    }
+  })
+  await page.screenshot({ path: path.join(shotDir, 'm2-07-roof-bipv.png'), fullPage: true })
+  log('场景E 屋面类型分支（坡屋面 + BIPV）完成')
 
   await browser.close()
   fs.writeFileSync(path.join(outDir, 'm2.json'), JSON.stringify(report, null, 2))

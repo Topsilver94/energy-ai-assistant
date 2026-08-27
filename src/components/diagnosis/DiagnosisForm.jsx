@@ -2,7 +2,12 @@ import { Activity, Loader2 } from 'lucide-react'
 import Button from '../ui/Button'
 import { useDiagnosisStore } from '../../stores/diagnosisStore'
 import { benchmarkTypes } from '../../data/benchmarks.js'
+import { recommendationRules } from '../../data/recommendationRules.js'
 import { useConfigStore } from '../../stores/configStore'
+
+// 屋面类型选项与典型值（规则表驱动，既有建筑的光伏规模推导用）
+const ROOF_OPTIONS = Object.keys(recommendationRules.roofTypes.values)
+const TYPICAL_ROOF = recommendationRules.typicalRoof.values
 
 // 建造年份滑杆范围（UI 边界，非计算系数）
 const YEAR_MIN = 1980
@@ -59,7 +64,7 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
           <span className="mb-1.5 block text-[13px] text-paper-mute">建筑类型</span>
           <select
             value={inputs.buildingType}
-            onChange={(e) => setInput({ buildingType: e.target.value })}
+            onChange={(e) => setInput({ buildingType: e.target.value, roofType: '' })}
             className={inputClass}
           >
             {benchmarkTypes.map((t) => (
@@ -134,6 +139,26 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
           </label>
         )}
       </div>
+
+      {/* 屋面类型（仅既有）：业主一眼可知的零成本信息，预选按建筑类型的典型值随类型切换 */}
+      {!isNew && (
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block">
+            <span className="mb-1.5 block text-[13px] text-paper-mute">屋面类型</span>
+            <select
+              value={inputs.roofType || TYPICAL_ROOF[inputs.buildingType] || '平屋面'}
+              onChange={(e) => setInput({ roofType: e.target.value })}
+              className={inputClass}
+            >
+              {ROOF_OPTIONS.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
 
       {isNew ? (
         <p className="text-[12px] leading-relaxed text-paper-mute">

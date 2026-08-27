@@ -69,13 +69,14 @@ export default function DiagnosisModule({ wide = false, onApplied }) {
         setLoading(false)
         return
       }
-      // 快照附 area / province：推荐引擎与结果展示需要，避免表单后续编辑造成错位
+      // 快照附 area / province / roofType：推荐引擎与结果展示需要，避免表单后续编辑造成错位
       setDiagnosis({
         ...result,
         buildingType: inputs.buildingType,
         year: inputs.year,
         area: Number(inputs.area),
         province: inputs.province,
+        roofType: inputs.roofType,
       })
       setLoading(false)
     }, MIN_LOADING_MS)
@@ -99,6 +100,7 @@ export default function DiagnosisModule({ wide = false, onApplied }) {
               buildingType: diagnosis.buildingType,
               area: diagnosis.area,
               province: diagnosis.province,
+              roofType: diagnosis.roofType,
             },
             config,
           )

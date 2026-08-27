@@ -17,6 +17,7 @@ export const useDiagnosisStore = create((set) => ({
     year: 2010, // 既有建筑用（滑杆）
     annualElectricityFee: '', // 既有建筑用
     designIntensity: '', // 新建建筑用：设计能耗强度 kWh/㎡·a，留空 = 按约束值预估
+    roofType: '', // 既有建筑用：屋面类型（空 = 按建筑类型典型值，影响光伏规模推导）
     province: '广东',
   },
   diagnosis: null,
