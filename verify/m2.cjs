@@ -1,9 +1,9 @@
 // 全链路验证脚本 · 模块① 挖掘痛点（工作模式，经 WorkNav 切页）
 // 场景A 既有办公：20000㎡ · 2010年 · 年电费200万 · 广东
-//   预期：强度133.3 / 潜力32.5% / 评级需改进 / 推荐分 储72(可考虑,500kWh) Pv60(可考虑,800kW) 桩45(8桩) 冷28
-//         （储能按广东 2026年8月 实际峰谷价差 1.2655 元/kWh 判定，升至可考虑档并居首）
+//   预期：强度133.3 / 潜力25.0%（基准100，商务办公口径）/ 评级需改进 / 推荐分 储72(可考虑,500kWh) Pv60(可考虑,800kW) 桩45(8桩) 冷28
+//         （储能按广东 2026年8月 实际峰谷价差 1.2655 元/kWh 判定，升至可考虑档并居首；25%<30% 措施不再标重点）
 //   一键填入 → 模块② 表单变为 pv=800 与 storage=500 启用（可考虑档全采纳）、其余关闭
-// 场景B 新建办公：20000㎡ · 设计强度100（> 约束90 → 超标）；再测留空（按约束值预估）
+// 场景B 新建办公：20000㎡ · 设计强度120（> 约束100 → 超标）；再测留空（按约束值预估）
 //   预期：不输出节能潜力
 // 场景D 既有商场 20000㎡：集中供冷双口径回归
 //   预期：占比0.9 → 供冷面积1.8万㎡ · 折算设计冷负荷2520kW（负荷指标140 W/㎡）
@@ -84,15 +84,15 @@ const log = (m) => {
   await page.screenshot({ path: path.join(shotDir, 'm2-02-after-apply.png'), fullPage: true })
   log('已回模块② 抓取表单状态')
 
-  // ── 场景B：新建办公，设计强度 100（约束 90 → 超标） ──
+  // ── 场景B：新建办公，设计强度 120（约束 100 → 超标） ──
   await page.locator('nav[aria-label="模块导航"] button:has-text("挖掘痛点")').click()
   await page.locator('button:has-text("新建建筑")').click()
   await page.locator('input[placeholder="如 10000"]').fill('20000')
-  await page.locator('input[placeholder^="留空按约束值"]').fill('100')
+  await page.locator('input[placeholder^="留空按约束值"]').fill('120')
   await page.locator('button:has-text("开始诊断")').click()
   await page.waitForTimeout(600)
   await page.screenshot({ path: path.join(shotDir, 'm2-03-new-over.png'), fullPage: true })
-  log('场景B 新建（设计100 > 约束90）诊断完成')
+  log('场景B 新建（设计120 > 约束100）诊断完成')
 
   report.extracted.newOverSummary = await page.evaluate(() =>
     [...document.querySelectorAll('.flex.items-baseline.justify-between')].map((el) => {
@@ -117,7 +117,7 @@ const log = (m) => {
   await page.screenshot({ path: path.join(shotDir, 'm2-04-new-blank.png'), fullPage: true })
   log('场景B-2 新建留空（按约束值预估）完成')
 
-  // ── 场景C：既有工业厂房（扩类型回归：基准80、大屋面光伏、措施文案、热力图位置） ──
+  // ── 场景C：既有工业厂房（扩类型回归：基准180电费全口径、大屋面光伏、措施文案、热力图位置） ──
   await page.locator('button:has-text("既有建筑")').click()
   await page.locator('select').first().selectOption('工业厂房')
   await page.locator('input[placeholder="如 10000"]').fill('20000')

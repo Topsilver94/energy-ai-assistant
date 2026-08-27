@@ -15,7 +15,7 @@ const BENCHMARK_SOURCE =
   '演示假设值：参考 GB/T 51161-2016《民用建筑能耗标准》约束值量级取整'
 
 export const benchmarkTypes = [
-  { key: '办公', label: '办公建筑', limit: 90, source: BENCHMARK_SOURCE },
+  { key: '办公', label: '办公建筑', limit: 100, source: BENCHMARK_SOURCE },
   { key: '商场', label: '商场建筑', limit: 220, source: BENCHMARK_SOURCE },
   { key: '医院', label: '医院建筑', limit: 160, source: BENCHMARK_SOURCE },
   { key: '酒店', label: '酒店建筑', limit: 120, source: BENCHMARK_SOURCE },
@@ -28,14 +28,16 @@ export const benchmarkTypes = [
   {
     key: '数据中心',
     label: '数据中心',
-    limit: 1500,
-    source: '演示假设值：按典型 PUE 1.4 与上架率折算的面积强度，口径与民用建筑差异大，仅作初筛',
+    limit: 6000,
+    source:
+      '演示假设值：按 IT 负荷密度约 0.5 kW/㎡ × 8760h × PUE 1.4 折算的面积强度中值；实际随机柜密度与上架率跨度大，仅作初筛',
   },
   {
     key: '工业厂房',
     label: '工业厂房',
-    limit: 80,
-    source: '演示假设值：轻工/电子类厂房常见区间中值，行业差异大，需按工艺能耗校核',
+    limit: 180,
+    source:
+      '演示假设值：电费全口径（含工艺负载）下轻工/电子类厂房常见区间中值；行业跨度 30–3000 kWh/㎡·a，仅作初筛，需按工艺能耗核定',
   },
 ]
 
