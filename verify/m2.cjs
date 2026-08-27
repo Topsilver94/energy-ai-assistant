@@ -5,6 +5,8 @@
 //   一键填入 → 模块② 表单变为 pv=800 与 storage=500 启用（可考虑档全采纳）、其余关闭
 // 场景B 新建办公：20000㎡ · 设计强度100（> 约束90 → 超标）；再测留空（按约束值预估）
 //   预期：不输出节能潜力
+// 场景D 既有商场 20000㎡：集中供冷双口径回归
+//   预期：占比0.9 → 供冷面积1.8万㎡ · 折算设计冷负荷2520kW（负荷指标140 W/㎡）
 const { chromium } = require('playwright')
 const fs = require('fs')
 const path = require('path')
@@ -134,6 +136,22 @@ const log = (m) => {
   })
   await page.screenshot({ path: path.join(shotDir, 'm2-05-industrial.png'), fullPage: true })
   log('场景C 既有工业厂房诊断完成（新增类型回归）')
+
+  // ── 场景D：既有商场（集中供冷双口径：占比折净 + 冷量折算） ──
+  await page.locator('select').first().selectOption('商场')
+  await page.locator('input[placeholder="如 10000"]').fill('20000')
+  await page.locator('input[placeholder="如 80"]').fill('200')
+  await page.locator('button:has-text("开始诊断")').click()
+  await page.waitForTimeout(600)
+  const mallBody = await page.evaluate(() => document.body.textContent.replace(/\s+/g, ' '))
+  report.extracted.mallDualCaliber = {
+    hasKw: mallBody.includes('折算设计冷负荷约 2520 kW'),
+    hasIndex: mallBody.includes('负荷指标 140 W/㎡'),
+    hasNetArea: mallBody.includes('供冷面积 1.8 万㎡'),
+    hasRatioNote: mallBody.includes('建筑面积 × 0.9 折算'),
+  }
+  await page.screenshot({ path: path.join(shotDir, 'm2-06-mall-cooling.png'), fullPage: true })
+  log('场景D 既有商场双口径诊断完成')
 
   await browser.close()
   fs.writeFileSync(path.join(outDir, 'm2.json'), JSON.stringify(report, null, 2))

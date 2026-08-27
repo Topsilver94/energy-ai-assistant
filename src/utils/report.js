@@ -13,6 +13,7 @@ import { PROJECT_TYPES } from '../stores/projectStore.js'
 import { getRecommendations } from './diagnosis.js'
 import { buildPhasing } from './phasing.js'
 import { buildSensitivity } from './sensitivity.js'
+import { coolingDesignKw } from './recommend.js'
 import { newBuildMeasures } from '../data/measures.js'
 
 const fmt = (n, digits = 1) => Number(n).toFixed(digits)
@@ -72,13 +73,20 @@ export const buildReportDraft = (project, diagnosis, config) => {
   const selected = selectedSystems(systems)
   if (selected.length === 0) throw new Error('未选择任何系统，无法生成方案')
 
-  const combo = selected
-    .map((t) => `${t.label} ${systems[t.key].capacity}${t.scaleUnit}`)
-    .join(' + ')
   const f = project.feasibility?.total ?? {}
   const items = project.feasibility?.items ?? []
   const d = diagnosis.diagnosis ?? {}
   const di = diagnosis.inputs ?? {}
+  // 集中供冷双口径：已知建筑类型时折算设计冷负荷（设备口径）一并写入组合描述
+  const combo = selected
+    .map((t) => {
+      const kw =
+        t.key === 'cooling'
+          ? coolingDesignKw(systems[t.key].capacity, d.buildingType ?? di.buildingType)
+          : null
+      return `${t.label} ${systems[t.key].capacity}${t.scaleUnit}${kw ? `（折算设计冷负荷约 ${kw} kW）` : ''}`
+    })
+    .join(' + ')
   const date = new Date().toLocaleString('zh-CN', { hour12: false })
   const isNew = d.buildingNature === 'new'
   const recommendations = isNew ? [] : getRecommendations(di.buildingType, d.savingPotential ?? 0)

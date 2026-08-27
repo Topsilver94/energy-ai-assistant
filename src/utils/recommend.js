@@ -18,6 +18,17 @@ import { calculateFeasibility } from './finance.js'
 const clamp = (v) => Math.min(100, Math.max(0, v))
 const round1 = (v) => Math.round(v * 10) / 10
 
+/**
+ * 折算设计冷负荷（kW）＝ 供冷面积(万㎡) × 1e4 ㎡ × 负荷指标(W/㎡) ÷ 1000。
+ * 规模口径仍为供冷面积（规划/可研口径），本函数提供设备口径（装机冷量）展示；
+ * 建筑类型未知（模块② 独立使用、未做诊断）时返回 null，不编造换算。
+ */
+export const coolingDesignKw = (coolingScaleWanSqm, buildingType) => {
+  const idx = R.coolingLoadIndex.values[buildingType ?? '']
+  const kw = idx ? Math.round(Number(coolingScaleWanSqm) * idx * 10) : NaN
+  return Number.isFinite(kw) && kw > 0 ? kw : null
+}
+
 // 全天候平稳负荷类型：储能充放不受日间波谷限制，利用率加分（引擎逻辑常数）
 const STEADY_LOAD_TYPES = ['医院', '酒店', '数据中心']
 // 区域供冷适用性弱的类型：高校以分体空调为主、工业厂房属工艺冷特例，达标也只给低档分
@@ -89,7 +100,10 @@ export const buildRecommendations = (
     ? (COOLING_WEAK_TYPES.includes(buildingType) ? 55 : buildingType === '办公' ? 62 : 75)
     : 28
   const coolingScore = clamp(Math.round(coolingBase + (isNew && coolingFits ? 15 : 0)))
-  const coolingScale = round1(area / 1e4)
+  // 供冷面积按占比折净（扣车库/机房/后勤等非供冷区域），投资与冷负荷均按净口径
+  const coolingRatio = R.coolingAreaRatio.values[buildingType] ?? 1
+  const coolingScale = round1((area * coolingRatio) / 1e4)
+  const coolingKw = coolingDesignKw(coolingScale, buildingType)
 
   // ── 充电桩：类型客流代理推断，车位未知 → 置信度如实降级为待确认 ──
   const pilesPer = R.chargerPilesPer10kSqm.values[buildingType] ?? 4
@@ -144,8 +158,13 @@ export const buildRecommendations = (
         coolingFits
           ? `${buildingType}建筑冷负荷稳定，面积 ${area.toLocaleString()} ㎡ ≥ 经济门槛 ${coolingMin.toLocaleString()} ㎡`
           : `面积 ${area.toLocaleString()} ㎡ 低于经济门槛 ${coolingMin.toLocaleString()} ㎡，管网摊销偏高`,
+        ...(coolingFits && coolingKw
+          ? [
+              `折算设计冷负荷约 ${coolingKw} kW（负荷指标 ${R.coolingLoadIndex.values[buildingType]} W/㎡），供冷面积 ${coolingScale} 万㎡`,
+            ]
+          : []),
         coolingFits
-          ? `供冷面积按建筑面积估算，如仅部分区域接入请单独测算`
+          ? `供冷面积按建筑面积 × ${coolingRatio} 折算（扣除车库/机房/后勤等非供冷区域），如仅部分区域接入请单独测算`
           : `可先评估单体高效机房，区域供冷留待扩建后重估`,
         ...(isNew && coolingFits ? ['规划期介入可共享管沟与机房土建，单位投资最低'] : []),
       ],
