@@ -44,7 +44,7 @@ const tintOf = (values, value, better) => {
  * 方案推荐热力图：4 系统 × 匹配度/IRR/回收期/碳减排 的投资价值矩阵。
  * 数据全部可溯源：匹配度 = 规则引擎评分，财务列 = 按建议规模单系统预估
  * （utils/recommend.js 调 calculateFeasibility）。色阶是列内相对比较而非绝对评级，
- * 图例注明口径——避免把相对梯度误读为绝对判断。
+ * 口径说明（怎么读图）置于表格下方，图例保留在标题行右端。
  */
 export default function ValueHeatmap({ recs }) {
   if (!recs || recs.length === 0) return null

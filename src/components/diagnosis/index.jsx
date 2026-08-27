@@ -123,16 +123,20 @@ export default function DiagnosisModule({ wide = false, onApplied }) {
         <StatusBadge done={isDiagnosisDone} />
       </div>
 
-      {/* 功能描述句置于「开始诊断」按钮之后；wide 布局下跟随左列表单列，
-          热力图随后补位左栏（诊断后出现），压缩整页纵向高度 */}
+      {/* 功能描述句置于「开始诊断」按钮之后；wide 布局下跟随左列表单列。
+          双栏齐平：左列 flex + 热力图 mt-auto 贴底；pb-5 抵消右列底部「填入模块②」
+          按钮行（mt-3 12px + 按钮 32px ≈ 44px − 表下说明句 24px），使热力图表格底端
+          对齐右列最后一张推荐卡的底端（而非按钮行）；偏差由 verify/heatmap-layout.cjs 守护 */}
       {wide ? (
-        <div className="mt-5 grid items-start gap-x-6 lg:grid-cols-2">
-          <div>
+        <div className="mt-5 grid gap-x-6 lg:grid-cols-2">
+          <div className="flex flex-col">
             <DiagnosisForm onSubmit={handleSubmit} loading={loading} />
             <p className="mt-3 text-sm leading-relaxed text-paper-mute">
               录入建筑信息与年度电费，对标行业基准，定位节能空间。
             </p>
-            <ValueHeatmap recs={recs} />
+            <div className="mt-auto pt-6 pb-5">
+              <ValueHeatmap recs={recs} />
+            </div>
           </div>
           <DiagnosisResults recs={recs} onApply={handleApply} />
         </div>
