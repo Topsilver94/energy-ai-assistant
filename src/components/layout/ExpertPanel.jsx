@@ -127,7 +127,7 @@ export default function ExpertPanel({ open, onClose, scope = 'expert' }) {
       ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  // 首字母定位：目标为当前分省组内的字母头（非分省组时索引条不渲染，不会触发）
+  // 首字母定位：目标为当前分省组内该字母的首省行（非分省组时索引条不渲染，不会触发）
   const jumpToLetter = (letter) => {
     setActiveLetter(letter)
     scrollRef.current
@@ -218,13 +218,16 @@ export default function ExpertPanel({ open, onClose, scope = 'expert' }) {
           >
             {sections.map((section, i) => {
               const shared = sharedSource(section)
-              // 分省组：字段按拼音首字母分组，字母头作为索引条锚点；普通组保持原序
+              // 分省组：按拼音首字母分组，每组首行挂字母锚点（右缘索引条定位用，列表内不渲染字母头）
               const rows = section.indexed
-                ? groupFieldsByInitial(section.fields).flatMap(({ letter, fields }) => [
-                    { kind: 'letter', key: `letter-${i}-${letter}`, letter },
-                    ...fields.map((field) => ({ kind: 'field', key: field.path, field })),
-                  ])
-                : section.fields.map((field) => ({ kind: 'field', key: field.path, field }))
+                ? groupFieldsByInitial(section.fields).flatMap(({ letter, fields }) =>
+                    fields.map((field, j) => ({
+                      key: field.path,
+                      field,
+                      letter: j === 0 ? letter : null,
+                    })),
+                  )
+                : section.fields.map((field) => ({ key: field.path, field }))
               return (
             <section
               key={section.title}
@@ -251,57 +254,46 @@ export default function ExpertPanel({ open, onClose, scope = 'expert' }) {
                 </p>
               )}
               <div>
-                {rows.map((row) =>
-                  row.kind === 'letter' ? (
-                    <div
-                      key={row.key}
-                      id={`expert-letter-${scope}-${i}-${row.letter}`}
-                      className="mb-1 mt-3 first:mt-0"
-                    >
-                      <span className="rounded bg-ink-raised px-1.5 py-0.5 font-mono text-[11px] text-paper-mute">
-                        {row.letter}
+                {rows.map((row) => (
+                  <div
+                    key={row.key}
+                    id={row.letter ? `expert-letter-${scope}-${i}-${row.letter}` : undefined}
+                    className="grid grid-cols-[1fr_162px] items-center gap-3 border-b border-line/40 py-2.5 last:border-0"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm text-paper">{row.field.label}</p>
+                      {!shared && (
+                        <p
+                          className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-paper-mute/80"
+                          title={row.field.source}
+                        >
+                          {row.field.source}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        step={row.field.step}
+                        value={String(getByPath(draft, row.field.path) ?? '')}
+                        onChange={(e) =>
+                          setDraft((d) => setByPath(d, row.field.path, e.target.value))
+                        }
+                        className="tabular w-full rounded-xl bg-ink-raised px-3 py-1.5 text-right font-mono text-sm text-paper outline-none transition-shadow focus:ring-2 focus:ring-volt"
+                      />
+                      <span className="w-14 shrink-0 text-[11px] leading-tight text-paper-mute">
+                        {row.field.unit}
                       </span>
                     </div>
-                  ) : (
-                    <div
-                      key={row.key}
-                      className="grid grid-cols-[1fr_162px] items-center gap-3 border-b border-line/40 py-2.5 last:border-0"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm text-paper">{row.field.label}</p>
-                        {!shared && (
-                          <p
-                            className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-paper-mute/80"
-                            title={row.field.source}
-                          >
-                            {row.field.source}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="number"
-                          step={row.field.step}
-                          value={String(getByPath(draft, row.field.path) ?? '')}
-                          onChange={(e) =>
-                            setDraft((d) => setByPath(d, row.field.path, e.target.value))
-                          }
-                          className="tabular w-full rounded-xl bg-ink-raised px-3 py-1.5 text-right font-mono text-sm text-paper outline-none transition-shadow focus:ring-2 focus:ring-volt"
-                        />
-                        <span className="w-14 shrink-0 text-[11px] leading-tight text-paper-mute">
-                          {row.field.unit}
-                        </span>
-                      </div>
-                    </div>
-                  ),
-                )}
+                  </div>
+                ))}
               </div>
             </section>
             )
           })}
           </div>
 
-          {/* 分省首字母索引条：浮动右缘（避开滚动条），点击定位当前分省组的字母头；
+          {/* 分省首字母索引条：浮动右缘（避开滚动条），点击定位当前分省组该字母的首省行；
               高亮随滚动联动，非分省组时整条隐藏 */}
           {railGroups && (
             <nav
