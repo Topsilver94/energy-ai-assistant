@@ -41,6 +41,7 @@ export default function DiagnosisResults({ recs, onApply }) {
         area: Number(inputs.area),
         province: inputs.province,
         roofType: inputs.roofType,
+        transformerKva: inputs.transformerKva,
       })
     }
   }, [config, isDiagnosisDone])

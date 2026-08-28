@@ -25,6 +25,13 @@ export const defaultConfig = {
     omRatioPerYear: 0.02,
     lifetimeYears: 10, // 电芯质保 typical 10 年
   },
+  // 储能定容参考（公开数据组）：模块① 储能规模双口径推导用，来源见下方 STORAGE_*_SOURCE
+  storageSizing: {
+    transformerVa: { 办公: 80, 商场: 100, 医院: 80, 酒店: 90, 高校: 40, 数据中心: 1200, 工业厂房: 50 }, // VA/㎡，推定单位面积配变容量
+    transformerPowerRatio: 0.25, // 储能功率占变压器容量上限（防倒送与接入口径）
+    hours: 2, // h，工商业主流 2 小时系统
+    peakShiftRatio: 0.35, // 日均用电量 → 峰段可消纳放电量系数（方案阶段代理）
+  },
   // 集中供冷（规模单位：万㎡；能源站 + 管网新建，冷费收益建模，见 utils/finance.js）
   cooling: {
     capexPerSqm: 300, // 元/㎡，能源站 + 管网 + 用户接入的单位投资
@@ -147,6 +154,10 @@ const COOLING_INDEX_SOURCES = {
     '面积指标法先天粗糙（舒适性约 100 / 一般空调厂房 150~250 / 洁净厂房 300~500），150 仅作量级粗估，实际以工艺资料逐项计算为准（GB 50019-2015）',
 }
 const CHARGER_PILES_SOURCE = '演示假设值：按建筑类型的充电桩配建水平（桩/万㎡），需车位与流量确认'
+const TRANSFORMER_VA_SOURCE =
+  '单位面积配变容量指标（VA/㎡）：民用建筑参考《全国民用建筑工程设计技术措施—电气》惯例区间取中值（办公 60~100、商场 80~120、酒店 80~100）；医院/高校/数据中心/工业厂房区间宽，取综合中值为演示假设值；实填报装容量后以实值为准'
+const STORAGE_SIZING_SOURCE =
+  '演示假设值：储能功率按变压器容量 25% 上限（防倒送与接入口径），2h 系统为工商业主流配置；峰段可转移系数 0.35 为日均用电量 → 峰段可消纳放电量的方案阶段代理'
 
 // 分省参数面板区（scope: public）：按「利用小时 / 电价 / 峰谷价差」拆组，组内字段标签只留省名；
 // indexed: true 标记组内为省名字段 → 面板按拼音首字母分组渲染并挂右缘索引条；
@@ -437,5 +448,18 @@ export const coefficientSections = [
     fields: benchmarkTypes.map((t) =>
       refField(`charger.pilesPer10kSqm.${t.key}`, `${t.label}配建`, '桩/万㎡', 1, CHARGER_PILES_SOURCE),
     ),
+  },
+  {
+    scope: 'public',
+    title: '储能定容参考',
+    hint: '模块① 储能规模双口径推导：变压器口径（推定或实填容量 × 功率占比上限 × 系统小时数）与负荷口径（日均用电量 × 峰段可转移系数）取短板；仅为方案阶段估算法',
+    fields: [
+      ...benchmarkTypes.map((t) =>
+        refField(`storageSizing.transformerVa.${t.key}`, `${t.label}配变指标`, 'VA/㎡', 10, TRANSFORMER_VA_SOURCE),
+      ),
+      refField('storageSizing.transformerPowerRatio', '功率占比上限', '', 0.05, STORAGE_SIZING_SOURCE),
+      refField('storageSizing.hours', '系统小时数', 'h', 0.5, STORAGE_SIZING_SOURCE),
+      refField('storageSizing.peakShiftRatio', '峰段可转移系数', '', 0.05, STORAGE_SIZING_SOURCE),
+    ],
   },
 ]

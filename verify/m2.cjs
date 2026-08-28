@@ -1,8 +1,8 @@
 // 全链路验证脚本 · 模块① 挖掘痛点（工作模式，经 WorkNav 切页）
 // 场景A 既有办公：20000㎡ · 2010年 · 年电费200万 · 广东
-//   预期：强度133.3 / 潜力25.0%（基准100，商务办公口径）/ 评级需改进 / 推荐分 储72(可考虑,500kWh) Pv60(可考虑,800kW) 桩45(8桩) 冷28
+//   预期：强度133.3 / 潜力25.0%（基准100，商务办公口径）/ 评级需改进 / 推荐分 储72(可考虑,800kWh 双口径定容) Pv60(可考虑,800kW) 桩45(8桩) 冷28
 //         （储能按广东 2026年8月 实际峰谷价差 1.2655 元/kWh 判定，升至可考虑档并居首；25%<30% 措施不再标重点）
-//   一键填入 → 模块② 表单变为 pv=800 与 storage=500 启用（可考虑档全采纳）、其余关闭
+//   一键填入 → 模块② 表单变为 pv=800 与 storage=800 启用（可考虑档全采纳）、其余关闭
 // 场景B 新建办公：20000㎡ · 设计强度120（> 约束100 → 超标）；再测留空（按约束值预估）
 //   预期：不输出节能潜力
 // 场景D 既有商场 20000㎡：集中供冷双口径回归
@@ -55,6 +55,18 @@ const log = (m) => {
   report.extracted.recommendations = await page.evaluate(() => {
     const items = [...document.querySelectorAll('.text-sm.font-semibold')].map((h) => h.textContent.trim())
     return items
+  })
+
+  // 储能定容双口径（既有·变压器留空 → 推定 20000㎡×80VA/㎡=1600kVA → 1600×25%×2h=800；
+  // 负荷口径 日均 7306kWh×0.35=2557，短板 800）+ 布置红线双出口之推荐侧
+  report.extracted.storageSizing = await page.evaluate(() => {
+    const body = document.body.textContent.replace(/\s+/g, ' ')
+    return {
+      hasLoadCaliber: body.includes('负荷口径：日均用电 7,306 kWh'),
+      hasTrafoCaliber: body.includes('变压器口径：按办公 80 VA/㎡ 推定约 1,600 kVA'),
+      hasShortfall: body.includes('按短板定容约 800 kWh'),
+      hasFireLine: body.includes('布置红线：户外电池舱（柜）间防火间距 ≥3 m'),
+    }
   })
 
   // 热力图：抓取含「匹配度」表头后的网格文本

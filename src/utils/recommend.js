@@ -11,7 +11,8 @@
  *     内部逻辑常数，决定相对排序而非财务结果
  *   - 每条推荐必须附触发依据（可解释性即可信度）
  *   - 推断不动的维度如实降级（充电桩车位未知 → confidence 'verify'）
- *   - 储能规模按光储配比估算，理由中注明需负荷数据修正，不冒充实测结论
+ *   - 储能定容双口径（负荷消纳 × 变压器接入）取短板，新建按光储配比兜底；
+ *     理由列明口径与推定值，不冒充实测结论
  */
 import { recommendationRules as R } from '../data/recommendationRules.js'
 import { calculateFeasibility } from './finance.js'
@@ -31,6 +32,14 @@ export const coolingDesignKw = (coolingScaleWanSqm, buildingType, config) => {
   const kw = idx ? Math.round(Number(coolingScaleWanSqm) * idx * 10) : NaN
   return Number.isFinite(kw) && kw > 0 ? kw : null
 }
+
+/**
+ * 储能布置红线（确定性提示，双出口：模块① 触发依据 + 模块③ prompt 注入）。
+ * 标准号与数字为现行国标口径：GB/T 51048-2025《电化学储能电站设计标准》
+ * （2026-04 实施，取代 GB 51048-2014）、GB/T 42288-2022《安全规程》、GB 55037-2022《建筑防火通用规范》。
+ */
+export const STORAGE_FIRE_LINE =
+  '布置红线：户外电池舱（柜）间防火间距 ≥3 m 或设防火墙分隔；单个防火分区额定能量 ≤50 MWh、相邻分区 ≥10 m；探测报警与灭火按 GB/T 42288-2022 配置，防火间距与建筑布置按 GB/T 51048-2025 与 GB 55037-2022 执行'
 
 // 全天候平稳负荷类型：储能充放不受日间波谷限制，利用率加分（引擎逻辑常数）
 const STEADY_LOAD_TYPES = ['医院', '酒店', '数据中心']
@@ -73,7 +82,16 @@ const estimateOf = (key, scale, province, config) => {
  *            confidence: 'high'|'medium'|'verify', estimate: object|null }>} 按 score 降序
  */
 export const buildRecommendations = (
-  { buildingNature = 'existing', buildingType, area: rawArea, province, roofType: rawRoof, year: rawYear },
+  {
+    buildingNature = 'existing',
+    buildingType,
+    area: rawArea,
+    province,
+    roofType: rawRoof,
+    year: rawYear,
+    annualConsumption: rawAnnualConsumption,
+    transformerKva: rawTransformerKva,
+  },
   config,
 ) => {
   const area = Number(rawArea)
@@ -114,10 +132,42 @@ export const buildRecommendations = (
   )
   const roofRatioText = Math.round(roofRatio * 100) / 100
 
-  // ── 储能：峰谷价差直读分省公开数据（代理购电月度表，日期随 coefficients.js 的 SPREAD_AS_OF 常量） ──
+  // ── 储能：峰谷价差直读分省公开数据（代理购电月度表，日期随 coefficients.js 的 SPREAD_AS_OF 常量）；
+  //    定容双口径取短板：负荷消纳（年电量→日均×峰段可转移系数）× 变压器接入（实填或推定容量×功率占比×小时数），
+  //    新建无负荷数据按光储配比兜底 ──
   const spread = prov.peakValleySpread
   const strongSpread = spread >= R.storageStrongSpread.values
-  const storageKwh = Math.max(R.storageMinKwh.values, Math.round(pvKw * R.storageToPvRatio.values))
+  const SS = config.storageSizing
+  const annualKwh = Number(rawAnnualConsumption)
+  let storageKwh
+  let sizingReasons
+  if (isNew || !Number.isFinite(annualKwh) || annualKwh <= 0) {
+    storageKwh = Math.max(R.storageMinKwh.values, Math.round(pvKw * R.storageToPvRatio.values))
+    sizingReasons = [
+      `新建无负荷数据，按光储配比 1:${R.storageToPvRatio.values} 兜底估算为 ${storageKwh} kWh，投产后按负荷曲线复核`,
+    ]
+  } else {
+    // 负荷口径：日均用电量 × 峰段可转移系数（峰段放电可消纳上限，方案阶段代理系数）
+    const dailyKwh = annualKwh / 365
+    const eLoad = Math.round(dailyKwh * SS.peakShiftRatio)
+    // 变压器口径：实填报装容量优先，留空按分类型配变指标推定（单位面积 VA/㎡ × 面积）
+    const filledKva = Number(rawTransformerKva)
+    const vaPerSqm = SS.transformerVa[buildingType] ?? 80
+    const kva = filledKva > 0 ? Math.round(filledKva) : Math.round((area * vaPerSqm) / 1000)
+    const kvaNote =
+      filledKva > 0
+        ? `实填 ${kva.toLocaleString()} kVA`
+        : `按${buildingType} ${vaPerSqm} VA/㎡ 推定约 ${kva.toLocaleString()} kVA`
+    const eTrafo = Math.round(kva * SS.transformerPowerRatio * SS.hours)
+    const binding = Math.min(eLoad, eTrafo)
+    // 取整到 50 kWh 工程档；下限保底 500 kWh（rules 门槛）
+    storageKwh = Math.max(R.storageMinKwh.values, Math.round(binding / 50) * 50)
+    sizingReasons = [
+      `负荷口径：日均用电 ${Math.round(dailyKwh).toLocaleString()} kWh × 峰段可转移系数 ${SS.peakShiftRatio} → 上限约 ${eLoad.toLocaleString()} kWh`,
+      `变压器口径：${kvaNote} × ${Math.round(SS.transformerPowerRatio * 100)}% × ${SS.hours}h → 上限约 ${eTrafo.toLocaleString()} kWh`,
+      `按短板定容约 ${storageKwh.toLocaleString()} kWh（${SS.hours}h 系统），需负荷曲线与实际报装容量复核`,
+    ]
+  }
   const storageScore = clamp(
     Math.round((strongSpread ? 72 : 48) + (STEADY_LOAD_TYPES.includes(buildingType) ? 8 : 0)),
   )
@@ -180,7 +230,8 @@ export const buildRecommendations = (
         ...(STEADY_LOAD_TYPES.includes(buildingType)
           ? [`${buildingType}全天负荷平稳，储能利用率高`]
           : []),
-        `规模按光储配比 1:${R.storageToPvRatio.values} 估算为 ${storageKwh} kWh，需负荷数据修正`,
+        ...sizingReasons,
+        STORAGE_FIRE_LINE,
       ],
       estimate: estimateOf('storage', storageKwh, province, config),
     },

@@ -60,6 +60,11 @@ export default function DiagnosisModule({ wide = false, onApplied }) {
         showToast('年度电费必须为大于 0 的数字')
         return
       }
+      const trafo = Number(inputs.transformerKva)
+      if (inputs.transformerKva !== '' && !(Number.isFinite(trafo) && trafo > 0)) {
+        showToast('变压器容量须为大于 0 的数字（留空则按类型指标推定）')
+        return
+      }
     }
     setLoading(true)
     window.setTimeout(() => {
@@ -77,6 +82,7 @@ export default function DiagnosisModule({ wide = false, onApplied }) {
         area: Number(inputs.area),
         province: inputs.province,
         roofType: inputs.roofType,
+        transformerKva: inputs.transformerKva,
       })
       setLoading(false)
     }, MIN_LOADING_MS)
@@ -102,6 +108,8 @@ export default function DiagnosisModule({ wide = false, onApplied }) {
               province: diagnosis.province,
               roofType: diagnosis.roofType,
               year: diagnosis.year,
+              annualConsumption: diagnosis.annualConsumption,
+              transformerKva: diagnosis.transformerKva,
             },
             config,
           )

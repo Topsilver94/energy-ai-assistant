@@ -11,7 +11,7 @@
 import { PROJECT_TYPES } from '../stores/projectStore.js'
 import { buildPhasing } from '../utils/phasing.js'
 import { buildSensitivity } from '../utils/sensitivity.js'
-import { coolingDesignKw } from '../utils/recommend.js'
+import { coolingDesignKw, STORAGE_FIRE_LINE } from '../utils/recommend.js'
 import { newBuildMeasures } from '../data/measures.js'
 import { eraOf, pvMandatedHint } from '../utils/diagnosis.js'
 
@@ -84,6 +84,10 @@ export const buildPrompt = (project, diagnosis, config) => {
     '【分项明细】\n' +
     (itemLines || '—') +
     '\n\n' +
+    (selected.some((t) => t.key === 'storage')
+      ? '【储能布置红线（确定性内容，请保留标准号与数字，仅润色措辞）】\n' +
+        `${STORAGE_FIRE_LINE}\n\n`
+      : '') +
     '【敏感性分析（系统按单变量扰动确定性重算，请保留全部数字与结论，仅润色措辞）】\n' +
     (sens ? sens.summaryLines.map((l) => `- ${l}`).join('\n') : '—') +
     '\n\n' +

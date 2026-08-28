@@ -140,7 +140,8 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
         )}
       </div>
 
-      {/* 屋面类型（仅既有）：业主一眼可知的零成本信息，预选按建筑类型的典型值随类型切换 */}
+      {/* 屋面类型 / 变压器容量（仅既有）：屋面业主一眼可知；变压器容量在供电合同上，
+          初次接触未必拿得到——留空按分类型配变指标推定（见公开抽屉·储能定容参考） */}
       {!isNew && (
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
@@ -156,6 +157,20 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
                 </option>
               ))}
             </select>
+          </label>
+          <label className="block">
+            <span className="mb-1.5 flex items-baseline justify-between text-[13px] text-paper-mute">
+              变压器容量 <span className="font-mono text-[12px]">选填·kVA</span>
+            </span>
+            <input
+              type="number"
+              min="0"
+              step="any"
+              placeholder="留空按类型指标推定"
+              value={inputs.transformerKva}
+              onChange={(e) => setInput({ transformerKva: e.target.value })}
+              className={`${inputClass} font-mono`}
+            />
           </label>
         </div>
       )}
