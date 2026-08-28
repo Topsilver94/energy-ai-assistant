@@ -27,7 +27,8 @@ export const recommendationRules = {
   },
   storageToPvRatio: {
     values: 0.5,
-    source: '演示假设值：光储配比 1:0.5（储能 kWh / 光伏 kW，工商业常见区间中值），规模需负荷数据修正',
+    source:
+      '演示假设值：光储配比 1:0.5（储能 kWh / 光伏 kW）——用户侧无强制配比标准，量级介于各省分布式光伏配储比例（8%~30%，发电侧强配口径）与厂商光储 1:1 技术上限之间取中；规模需负荷数据修正',
   },
   storageMinKwh: {
     values: 500,
