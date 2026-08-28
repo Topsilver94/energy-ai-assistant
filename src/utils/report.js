@@ -92,6 +92,12 @@ export const buildReportDraft = (project, diagnosis, config) => {
     .join(' + ')
   const date = new Date().toLocaleString('zh-CN', { hour12: false })
   const isNew = d.buildingNature === 'new'
+  // 光储协同定性提示：组合同时含光伏与储能、且为两充两放省（存在午间充电窗口）时注入
+  const provCfg = config.provinces[project.inputs.province] ?? Object.values(config.provinces)[0]
+  const pvStorageSynergy =
+    selected.some((t) => t.key === 'pv') &&
+    selected.some((t) => t.key === 'storage') &&
+    (provCfg.cyclesPerDay ?? 1) >= 2
   const recommendations = isNew ? [] : getRecommendations(di.buildingType, d.savingPotential ?? 0)
   // 建成年代 → 标准代际侧重（既有注入；新建无年份语义）
   const era = isNew ? null : eraOf(di.year)
@@ -146,7 +152,11 @@ export const buildReportDraft = (project, diagnosis, config) => {
 | --- | --- | --- | --- | --- | --- |
 ${itemRows}
 
-> 组合 IRR / 回收期按合并现金流测算（共同计算期取各系统寿命最大值，到期归零）；充电桩不计碳减排。
+> 组合 IRR / 回收期按合并现金流测算（共同计算期取各系统寿命最大值，到期归零）；充电桩不计碳减排。${
+    pvStorageSynergy
+      ? '\n>\n> 光储协同：午间第二循环充电窗口与光伏大发时段重叠，可消纳光伏余电、提升自用率并防逆流（定性提示，收益仍按峰谷价差口径计）。'
+      : ''
+  }
 
 ### 敏感性分析（单变量扰动 ±10% / ±20%）
 

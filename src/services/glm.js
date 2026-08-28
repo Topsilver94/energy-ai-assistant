@@ -75,6 +75,11 @@ export const buildPrompt = (project, diagnosis, config) => {
     storageCycles >= 2
       ? `运行模式：${project.inputs.province}分时结构支持两充两放，第二循环按约半额价差折算（收益已按此口径计算）`
       : `运行模式：${project.inputs.province}分时结构按一充一放测算，可叠加需量管理增厚收益`
+  // 光储协同定性提示：组合同时含光伏与储能、且为两充两放省（存在午间充电窗口）时注入
+  const pvStorageSynergy =
+    selected.some((t) => t.key === 'pv') && selected.some((t) => t.key === 'storage') && storageCycles >= 2
+      ? '光储协同：午间第二循环充电窗口与光伏大发时段重叠，可消纳光伏余电、提升自用率并防逆流（定性提示，收益仍按峰谷价差口径计）'
+      : null
 
   const user =
     '请根据以下项目数据生成一份 1 页式综合能源改造方案：\n\n' +
@@ -93,6 +98,7 @@ export const buildPrompt = (project, diagnosis, config) => {
     (selected.some((t) => t.key === 'storage')
       ? '【储能运行与布置（确定性内容，请保留标准号与数字，仅润色措辞）】\n' +
         `${storageModeLine}\n` +
+        (pvStorageSynergy ? `${pvStorageSynergy}\n` : '') +
         `${STORAGE_FIRE_LINE}\n\n`
       : '') +
     '【敏感性分析（系统按单变量扰动确定性重算，请保留全部数字与结论，仅润色措辞）】\n' +
