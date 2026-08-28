@@ -61,6 +61,7 @@ export default function DiagnosisResults({ recs, onApply }) {
   }
 
   const isNew = diagnosis.buildingNature === 'new'
+  // 预估口径（电费未知兜底）：潜力为典型值推演非实测对标，挂依据卡提醒
   // 建成年代 → 标准代际侧重提示（确定性派生；新建/未填年份不展示）
   const era = isNew ? null : eraOf(diagnosis.year)
   const pvHint = era ? pvMandatedHint(diagnosis.year) : null
@@ -103,6 +104,25 @@ export default function DiagnosisResults({ recs, onApply }) {
           </div>
         ))}
       </div>
+
+      {/* 预估口径依据（电费未知兜底）：双口径取短板过程透明呈现，潜力注明推演性质 */}
+      {!isNew && diagnosis.estimate && (
+        <div className="rounded-lg border border-line bg-ink-raised px-3.5 py-2.5">
+          <p className="text-[11px] uppercase tracking-widest text-paper-mute">
+            能耗口径 · 预估（电费未知）
+          </p>
+          <ul className="mt-1.5 space-y-1">
+            {diagnosis.estimate.lines.map((line) => (
+              <li key={line} className="text-[12px] leading-relaxed text-paper-mute">
+                {line}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1.5 text-[12px] leading-relaxed text-paper-mute">
+            潜力为典型值推演（非实测对标），补电费单回填后自动转实测口径。
+          </p>
+        </div>
+      )}
 
       {/* 基准对比条 */}
       {showBar && (
@@ -182,7 +202,9 @@ export default function DiagnosisResults({ recs, onApply }) {
       ) : (
         <div className="flex items-center justify-between rounded-lg border border-line bg-ink-raised px-4 py-3">
           <div>
-            <p className="text-[11px] uppercase tracking-widest text-paper-mute">节能潜力</p>
+            <p className="text-[11px] uppercase tracking-widest text-paper-mute">
+              节能潜力{diagnosis.estimate ? '（预估口径）' : ''}
+            </p>
             <p className="tabular mt-1 font-mono text-3xl font-semibold text-paper">
               {diagnosis.savingPotential.toFixed(1)}
               <span className="ml-1 text-base">%</span>

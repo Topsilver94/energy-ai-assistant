@@ -33,6 +33,14 @@ export const defaultConfig = {
     hours: 2, // h，工商业主流 2 小时系统
     peakShiftRatio: 0.35, // 日均用电量 → 峰段可消纳放电量系数（方案阶段代理）
   },
+  // 电耗预估参考（公开数据组）：模块① 年度电费未知时的兜底预估——
+  // 面积口径（典型实际强度 × 面积）与变压器口径（kVA × 功率因数 × 负载率 × 8760h）取短板，
+  // 来源见下方 TYPICAL_INTENSITY_SOURCES / LOAD_FACTOR_SOURCE
+  loadEstimate: {
+    typicalIntensity: { 办公: 115, 商场: 250, 医院: 180, 酒店: 135, 高校: 75, 数据中心: 6600, 工业厂房: 200 }, // kWh/㎡·a，存量调研区间中值（与对标基准表分开维护，防循环论证）
+    transformerPowerFactor: 0.9, // 无功补偿后功率因数
+    transformerLoadFactor: { 办公: 0.25, 商场: 0.35, 医院: 0.3, 酒店: 0.3, 高校: 0.2, 数据中心: 0.8, 工业厂房: 0.25 }, // 配变平均负载率
+  },
   // 集中供冷（规模单位：万㎡；能源站 + 管网新建，冷费收益建模，见 utils/finance.js）
   cooling: {
     capexPerSqm: 300, // 元/㎡，能源站 + 管网 + 用户接入的单位投资
@@ -165,6 +173,21 @@ const TRANSFORMER_VA_SOURCE =
   '单位面积配变容量指标（VA/㎡）：民用建筑参考《全国民用建筑工程设计技术措施—电气》惯例区间取中值（办公 60~100、商场 80~120、酒店 80~100）；医院/高校/数据中心/工业厂房区间宽，取综合中值为演示假设值；实填报装容量后以实值为准'
 const STORAGE_SIZING_SOURCE =
   '演示假设值：储能功率按变压器容量 25% 上限（防倒送与接入口径），2h 系统为工商业主流配置；峰段可转移系数 0.35 为日均用电量 → 峰段可消纳放电量的方案阶段代理'
+
+// 典型实际强度分类型来源：存量调研区间中值落点（隐含潜力约 7%~13%，行业「既有公共建筑
+// 平均节能潜力 10%~20%」叙事的保守下沿——有吸引力又兑现得了）；与对标基准表分开成表，
+// 避免用基准推实际、再拿推出来的数对标基准的循环论证
+const TYPICAL_INTENSITY_SOURCES = {
+  办公: '演示假设值：存量办公电耗调研区间 70–150 kWh/㎡·a，取中偏上 115（客群老旧建筑占比高），量级参考中国建筑节能协会《中国建筑能耗研究报告》',
+  商场: '演示假设值：存量商场电耗调研区间 150–300 kWh/㎡·a，取中值 250，量级参考中国建筑节能协会《中国建筑能耗研究报告》',
+  医院: '演示假设值：存量医院电耗调研区间 120–220 kWh/㎡·a，取中值 180（24h 运行 + 设备密度高），量级参考中国建筑节能协会《中国建筑能耗研究报告》',
+  酒店: '演示假设值：存量酒店电耗调研区间 90–160 kWh/㎡·a，取中值 135，量级参考中国建筑节能协会《中国建筑能耗研究报告》',
+  高校: '演示假设值：高校电耗调研区间 40–90 kWh/㎡·a，取 75（寒暑假低负荷拉低全年均值，潜力天然小），量级参考中国建筑节能协会《中国建筑能耗研究报告》',
+  数据中心: '演示假设值：按上架率与 PUE 波动取 6600（约基准 ×1.1）；此类客户电费为核心成本，几乎不会走兜底路径',
+  工业厂房: '演示假设值：工艺负载主导、行业跨度极大，200 仅量级粗估，需按工艺能耗核定',
+}
+const LOAD_FACTOR_SOURCE =
+  '演示假设值：分类型配变平均负载率（民用 20%–35%，数据中心常年高载 80%）；变压器口径年电量 = kVA × 功率因数 × 负载率 × 8760h'
 
 // 分省参数面板区（scope: public）：按「利用小时 / 电价 / 峰谷价差」拆组，组内字段标签只留省名；
 // indexed: true 标记组内为省名字段 → 面板按拼音首字母分组渲染并挂右缘索引条；
@@ -477,6 +500,26 @@ export const coefficientSections = [
       refField('storageSizing.transformerPowerRatio', '功率占比上限', '', 0.05, STORAGE_SIZING_SOURCE),
       refField('storageSizing.hours', '系统小时数', 'h', 0.5, STORAGE_SIZING_SOURCE),
       refField('storageSizing.peakShiftRatio', '峰段可转移系数', '', 0.05, STORAGE_SIZING_SOURCE),
+    ],
+  },
+  {
+    scope: 'public',
+    title: '电耗预估参考',
+    hint: '模块① 年度电费未知时的兜底预估：面积 × 典型实际强度 与 变压器 × 功率因数 × 负载率 × 8760h 双口径取短板；均为方案阶段量级预估，补电费单后回填即转实测对标',
+    fields: [
+      ...benchmarkTypes.map((t) =>
+        refField(
+          `loadEstimate.typicalIntensity.${t.key}`,
+          `${t.label}典型强度`,
+          'kWh/㎡·a',
+          5,
+          TYPICAL_INTENSITY_SOURCES[t.key],
+        ),
+      ),
+      refField('loadEstimate.transformerPowerFactor', '功率因数', '', 0.05, LOAD_FACTOR_SOURCE),
+      ...benchmarkTypes.map((t) =>
+        refField(`loadEstimate.transformerLoadFactor.${t.key}`, `${t.label}负载率`, '', 0.05, LOAD_FACTOR_SOURCE),
+      ),
     ],
   },
 ]

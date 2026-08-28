@@ -110,10 +110,10 @@ export const buildPrompt = (project, diagnosis, config) => {
       : `建造年份：${di.year ?? '—'} 年${era ? `，属${era.label}` : ''}\n` +
         (era ? `年代改造侧重：${era.focus}（按标准代际确定性派生，润色时保持方向与结论）\n` : '') +
         (pvHint ? `光伏余量提示：${pvHint}（确定性提示，请保留）\n` : '') +
-        `年用电量：${fmt(d.annualConsumption / 1e4)} 万 kWh\n` +
-        `实际单位能耗：${fmt(d.actualIntensity)} kWh/㎡·a\n` +
+        `年用电量：${fmt(d.annualConsumption / 1e4)} 万 kWh${d.estimate ? '（预估）' : ''}\n` +
+        `实际单位能耗：${fmt(d.actualIntensity)} kWh/㎡·a${d.estimate ? '（电费未知，按典型强度/变压器口径预估）' : ''}\n` +
         `行业基准能耗：${fmt(d.benchmarkIntensity, 0)} kWh/㎡·a\n` +
-        `节能潜力：${fmt(d.savingPotential)} %\n` +
+        `节能潜力：${fmt(d.savingPotential)} %${d.estimate ? '（预估口径，典型值推演非实测对标，请保留此标注）' : ''}\n` +
         `能效评级：${d.rating ?? '—'}\n`) +
     (d.buildingNature === 'new'
       ? '【技术路径参考（新建·一体化设计，确定性内容，可润色勿改结论）】\n' +

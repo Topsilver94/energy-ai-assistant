@@ -8,6 +8,9 @@
 // 场景D 既有商场 20000㎡：集中供冷双口径回归
 //   预期：占比0.9 → 供冷面积1.8万㎡ · 折算设计冷负荷3600kW（负荷指标200 W/㎡，手册区间中值）
 // 场景E 屋面类型分支：既有办公·坡屋面 → 728kW；新建办公 → BIPV满铺 1008kW（平屋面典型=场景A 800kW）
+// 场景F 电费未知兜底：F1 留空 → 面积口径 115×20000=230万kWh → 潜力 13.0%（预估标注）
+//   F2 变压器实填 1100kVA → 变压器口径 216.8万 < 面积口径 230万 → 取短板，强度 108.4
+//   F3 月均电费 16万 → 年 192万 ÷ 0.75 = 256万kWh → 强度 128.0，转实测口径（预估卡消失）
 const { chromium } = require('playwright')
 const fs = require('fs')
 const path = require('path')
@@ -195,6 +198,56 @@ const log = (m) => {
   })
   await page.screenshot({ path: path.join(shotDir, 'm2-07-roof-bipv.png'), fullPage: true })
   log('场景E 屋面类型分支（坡屋面 + BIPV）完成')
+
+  // ── 场景F：电费未知兜底（面积口径 → 变压器口径取短板 → 月度电费转实测） ──
+  await page.locator('button:has-text("既有建筑")').click()
+  await page.locator('select').first().selectOption('办公')
+  await page.locator('input[placeholder="如 10000"]').fill('20000')
+  await page.locator('input[placeholder="如 80"]').fill('')
+  await page.locator('input[placeholder="留空按类型指标推定"]').fill('')
+  await page.locator('button:has-text("开始诊断")').click()
+  await page.waitForTimeout(600)
+  report.extracted.feeFallbackArea = await page.evaluate(() => {
+    const body = document.body.textContent.replace(/\s+/g, ' ')
+    return {
+      hasAreaCaliber: body.includes(
+        '面积口径：按办公典型实际强度 115 kWh/㎡·a × 20,000 ㎡ → 年用电约 230 万 kWh',
+      ),
+      hasEstimatedTag: body.includes('能耗口径 · 预估（电费未知）'),
+      hasPotential13: body.includes('13.0'),
+    }
+  })
+  await page.screenshot({ path: path.join(shotDir, 'm2-08-fee-fallback.png'), fullPage: true })
+  log('场景F-1 电费留空（面积口径兜底）完成')
+
+  // F-2：实填变压器 1100 kVA → 变压器口径 1100×0.9×0.25×8760=216.8万 < 面积口径 230万 → 取短板
+  await page.locator('input[placeholder="留空按类型指标推定"]').fill('1100')
+  await page.locator('button:has-text("开始诊断")').click()
+  await page.waitForTimeout(600)
+  report.extracted.feeFallbackTrafo = await page.evaluate(() => {
+    const body = document.body.textContent.replace(/\s+/g, ' ')
+    return {
+      hasTrafoCaliber: body.includes('变压器口径：1,100 kVA × 0.9 × 0.25 负载率 × 8760h'),
+      hasShortfallNote: body.includes('双口径取短板：按变压器口径'),
+      hasIntensity108: body.includes('108.4'),
+    }
+  })
+  log('场景F-2 变压器口径取短板完成')
+
+  // F-3：切按月口径，月均 16 万 → 年 192 万 ÷ 0.75 = 256万 kWh → 强度 128.0，转实测（预估卡消失）
+  await page.locator('button:has-text("按月")').click()
+  await page.locator('input[placeholder="如 7"]').fill('16')
+  await page.locator('button:has-text("开始诊断")').click()
+  await page.waitForTimeout(600)
+  report.extracted.feeMonthly = await page.evaluate(() => {
+    const body = document.body.textContent.replace(/\s+/g, ' ')
+    return {
+      isMeasured: !body.includes('能耗口径 · 预估（电费未知）'),
+      hasIntensity128: body.includes('128.0'),
+    }
+  })
+  await page.screenshot({ path: path.join(shotDir, 'm2-09-fee-monthly.png'), fullPage: true })
+  log('场景F-3 月均电费转实测口径完成')
 
   await browser.close()
   fs.writeFileSync(path.join(outDir, 'm2.json'), JSON.stringify(report, null, 2))

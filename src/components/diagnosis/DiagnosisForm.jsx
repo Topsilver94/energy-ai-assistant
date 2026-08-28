@@ -125,17 +125,40 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
         ) : (
           <label className="block">
             <span className="mb-1.5 flex items-baseline justify-between text-[13px] text-paper-mute">
-              年度电费 <span className="font-mono text-[12px]">单位：万元</span>
+              {inputs.feePeriod === 'monthly' ? '月均电费' : '年度电费'}
+              {/* 按年/按月口径切换：客户记得「一个月十几万」往往比年度账单容易 */}
+              <span className="flex items-center gap-0.5 rounded-full border border-line bg-ink-raised p-0.5 font-mono text-[11px]">
+                {[
+                  { key: 'annual', label: '按年' },
+                  { key: 'monthly', label: '按月' },
+                ].map((p) => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => setInput({ feePeriod: p.key })}
+                    className={`rounded-full px-2 py-0.5 transition-colors ${
+                      inputs.feePeriod === p.key
+                        ? 'bg-volt font-semibold text-ink'
+                        : 'text-paper-mute hover:text-paper'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </span>
             </span>
             <input
               type="number"
               min="0"
               step="any"
-              placeholder="如 80"
+              placeholder={inputs.feePeriod === 'monthly' ? '如 7' : '如 80'}
               value={inputs.annualElectricityFee}
               onChange={(e) => setInput({ annualElectricityFee: e.target.value })}
               className={`${inputClass} font-mono`}
             />
+            <span className="mt-1 block text-[11px] text-paper-mute">
+              留空则按典型强度 / 变压器口径预估
+            </span>
           </label>
         )}
       </div>

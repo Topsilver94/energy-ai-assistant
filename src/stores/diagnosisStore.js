@@ -15,7 +15,8 @@ export const useDiagnosisStore = create((set) => ({
     buildingType: '办公',
     area: '',
     year: 2010, // 既有建筑用（滑杆）
-    annualElectricityFee: '', // 既有建筑用
+    annualElectricityFee: '', // 既有建筑用（留空 = 按电耗预估参考兜底，结果挂「预估」标注）
+    feePeriod: 'annual', // 电费口径：'annual' 按年 | 'monthly' 按月（×12 折年）
     designIntensity: '', // 新建建筑用：设计能耗强度 kWh/㎡·a，留空 = 按约束值预估
     roofType: '', // 既有建筑用：屋面类型（空 = 按建筑类型典型值，影响光伏规模推导）
     transformerKva: '', // 既有建筑用：变压器容量 kVA（选填，空 = 按分类型配变指标推定，影响储能定容）

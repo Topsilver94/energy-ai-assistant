@@ -127,7 +127,7 @@ export const buildReportDraft = (project, diagnosis, config) => {
       ? d.designChecked
         ? `设计强度 ${fmt(d.actualIntensity)} kWh/㎡·a vs 约束值 ${d.benchmarkIntensity} kWh/㎡·a，${d.checkResult}`
         : `按约束值 ${d.benchmarkIntensity} kWh/㎡·a 预估年用电量 ${fmt(d.annualConsumption / 1e4)} 万 kWh`
-      : `实际能耗强度 ${fmt(d.actualIntensity)} kWh/㎡·a，对标基准 ${d.benchmarkIntensity ?? '—'} kWh/㎡·a，能效评级「${d.rating ?? '—'}」`
+      : `实际能耗强度 ${fmt(d.actualIntensity)} kWh/㎡·a，对标基准 ${d.benchmarkIntensity ?? '—'} kWh/㎡·a，能效评级「${d.rating ?? '—'}」${d.estimate ? '（电费未知，按预估口径推演，补电费单后转实测对标）' : ''}`
   }
 
 ## 二、财务分析（组合总账）

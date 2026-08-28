@@ -56,8 +56,8 @@ export default function DiagnosisModule({ wide = false, onApplied }) {
       }
     } else {
       const fee = Number(inputs.annualElectricityFee)
-      if (!Number.isFinite(fee) || fee <= 0) {
-        showToast('年度电费必须为大于 0 的数字')
+      if (inputs.annualElectricityFee !== '' && !(Number.isFinite(fee) && fee > 0)) {
+        showToast('电费须为大于 0 的数字（留空则按预估口径兜底）')
         return
       }
       const trafo = Number(inputs.transformerKva)

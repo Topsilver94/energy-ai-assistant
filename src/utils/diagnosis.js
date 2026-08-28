@@ -3,8 +3,11 @@
  * 电价与建筑基准一律从 config 读取；本文件只放「评级分档」这类分类逻辑常数。
  *
  * 口径（按建筑性质分流）：
- *   既有：年用电量(kWh) = 年电费(万元) × 1e4 ÷ 电价；实际强度 = 用电量 ÷ 面积；
- *         节能潜力% = max(0, (实际 − 基准) ÷ 实际 × 100)
+ *   既有（实测口径）：年用电量(kWh) = 电费(万元，按年或按月×12) × 1e4 ÷ 电价；
+ *         实际强度 = 用电量 ÷ 面积；节能潜力% = max(0, (实际 − 基准) ÷ 实际 × 100)
+ *   既有（预估口径，电费未知）：年用电量按「电耗预估参考」双口径取短板——
+ *         面积口径 = 典型实际强度 × 面积；变压器口径 = kVA × 功率因数 × 负载率 × 8760h；
+ *         结果携带 estimate 依据行（UI 挂「预估」标签；潜力为典型值推演，非实测对标）
  *   新建：无实际电费 → 采用强度 = 设计值（若填）或约束值（预估）；
  *         预估年用电量 = 采用强度 × 面积；设计校核 = 设计值 vs 约束值；
  *         不输出节能潜力（无实际基线，红线：不编造数据）
@@ -20,11 +23,11 @@ const STAR_THRESHOLD = 30
 
 /**
  * @param {{ buildingNature?: 'existing'|'new', area, buildingType, annualElectricityFee,
- *           designIntensity, province }} params
+ *           feePeriod?: 'annual'|'monthly', transformerKva, designIntensity, province }} params
  * @param {object} config configStore 纯数值配置
- * @returns 诊断结果 | null（面积/电费等无效时）
+ * @returns 诊断结果 | null（面积等无效时；电费未知走预估口径不再返回 null）
  *   既有：{ buildingNature, annualConsumption, actualIntensity, benchmarkIntensity,
- *           savingPotential, rating }
+ *           savingPotential, rating, estimate: { lines } | null（预估口径依据行，实测为 null） }
  *   新建：{ buildingNature, annualConsumption(预估), actualIntensity(采用强度),
  *           benchmarkIntensity, savingPotential: null, rating: null,
  *           designChecked, checkResult: '达标'|'超标'|null, overRatio }
@@ -35,6 +38,8 @@ export const calculateDiagnosis = (
     area: rawArea,
     buildingType,
     annualElectricityFee: rawFee,
+    feePeriod: rawFeePeriod = 'annual',
+    transformerKva: rawTrafoKva,
     designIntensity: rawDesign,
     province,
   },
@@ -67,11 +72,41 @@ export const calculateDiagnosis = (
     }
   }
 
-  // ── 既有建筑：电费反推 + 对标（原口径不变） ──
-  const fee = Number(rawFee)
-  if (!Number.isFinite(fee) || fee <= 0) return null
+  // ── 既有建筑：电费反推（实测口径）；电费未知按电耗预估参考兜底（预估口径） ──
+  const feeRaw = Number(rawFee)
+  const fee =
+    Number.isFinite(feeRaw) && feeRaw > 0 ? feeRaw * (rawFeePeriod === 'monthly' ? 12 : 1) : null
 
-  const annualConsumption = (fee * 10000) / prov.elecPrice // kWh
+  let annualConsumption
+  let estimate = null // 预估口径依据行（实测口径为 null；UI 与模块③ 以此挂「预估」标注）
+  if (fee) {
+    annualConsumption = (fee * 10000) / prov.elecPrice // kWh
+  } else {
+    // 面积口径：分类型典型实际强度（存量调研中值，公开抽屉可调）× 面积
+    const LE = config.loadEstimate
+    const typical = LE.typicalIntensity[buildingType] ?? LE.typicalIntensity.办公
+    const byArea = typical * area
+    // 变压器口径：实填报装容量 × 功率因数 × 分类型平均负载率 × 8760h（未填则无此口径）
+    const kva = Number(rawTrafoKva)
+    const loadFactor = LE.transformerLoadFactor[buildingType] ?? 0.3
+    const byTrafo =
+      Number.isFinite(kva) && kva > 0
+        ? kva * LE.transformerPowerFactor * loadFactor * 8760
+        : null
+    annualConsumption = byTrafo ? Math.min(byArea, byTrafo) : byArea
+    estimate = {
+      lines: [
+        `面积口径：按${buildingType}典型实际强度 ${typical} kWh/㎡·a × ${area.toLocaleString()} ㎡ → 年用电约 ${Math.round(byArea / 1e4).toLocaleString()} 万 kWh`,
+        ...(byTrafo
+          ? [
+              `变压器口径：${Math.round(kva).toLocaleString()} kVA × ${LE.transformerPowerFactor} × ${loadFactor} 负载率 × 8760h → 年用电约 ${Math.round(byTrafo / 1e4).toLocaleString()} 万 kWh`,
+              byTrafo < byArea ? '双口径取短板：按变压器口径' : '双口径取短板：按面积口径',
+            ]
+          : []),
+        ...(buildingType === '工业厂房' ? ['工艺负载主导，强度仅量级粗估，需按工艺能耗核定'] : []),
+      ],
+    }
+  }
   const actualIntensity = annualConsumption / area // kWh/㎡·a
   const savingPotential = Math.max(0, ((actualIntensity - benchmark) / actualIntensity) * 100)
 
@@ -85,6 +120,7 @@ export const calculateDiagnosis = (
     benchmarkIntensity: benchmark,
     savingPotential,
     rating,
+    estimate,
   }
 }
 
