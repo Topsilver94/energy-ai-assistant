@@ -82,7 +82,7 @@ export const buildReportDraft = (project, diagnosis, config) => {
     .map((t) => {
       const kw =
         t.key === 'cooling'
-          ? coolingDesignKw(systems[t.key].capacity, d.buildingType ?? di.buildingType)
+          ? coolingDesignKw(systems[t.key].capacity, d.buildingType ?? di.buildingType, config)
           : null
       return `${t.label} ${systems[t.key].capacity}${t.scaleUnit}${kw ? `（折算设计冷负荷约 ${kw} kW）` : ''}`
     })

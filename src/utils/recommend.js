@@ -6,8 +6,9 @@
  * 单系统测算——数字来自自家计算器，可完整溯源（热力图财务列即此数据）。
  *
  * 纪律：
- *   - 规模与阈值类参数全部来自 data/recommendationRules.js（带 source）；
- *     打分权重（如基线 40/72）为引擎内部逻辑常数，决定相对排序而非财务结果
+ *   - 经验查表值（屋面/供冷折算/充电桩配建）读 config 公开参考表，推断阈值读
+ *     data/recommendationRules.js（均带 source）；打分权重（如基线 40/72）为引擎
+ *     内部逻辑常数，决定相对排序而非财务结果
  *   - 每条推荐必须附触发依据（可解释性即可信度）
  *   - 推断不动的维度如实降级（充电桩车位未知 → confidence 'verify'）
  *   - 储能规模按光储配比估算，理由中注明需负荷数据修正，不冒充实测结论
@@ -25,8 +26,8 @@ const round1 = (v) => Math.round(v * 10) / 10
  * 规模口径仍为供冷面积（规划/可研口径），本函数提供设备口径（装机冷量）展示；
  * 建筑类型未知（模块② 独立使用、未做诊断）时返回 null，不编造换算。
  */
-export const coolingDesignKw = (coolingScaleWanSqm, buildingType) => {
-  const idx = R.coolingLoadIndex.values[buildingType ?? '']
+export const coolingDesignKw = (coolingScaleWanSqm, buildingType, config) => {
+  const idx = config?.cooling?.loadIndex?.[buildingType ?? '']
   const kw = idx ? Math.round(Number(coolingScaleWanSqm) * idx * 10) : NaN
   return Number.isFinite(kw) && kw > 0 ? kw : null
 }
@@ -84,18 +85,18 @@ export const buildRecommendations = (
 
   // ── 光伏：屋面条件推导——既有按屋面类型（平/坡/彩钢，未选按类型典型值），
   //    新建不问屋面（设计未定）直接按 BIPV 一体化满铺口径；规模 kW（备案/并网通行） ──
-  const typeRatio = R.roofUsableRatio.values[buildingType] ?? 0.4
+  const typeRatio = config.roof.usableRatio[buildingType] ?? 0.4
   let roofRatio
   let roofDensity
   let roofLabel
   let roofNote = null
   if (isNew) {
-    roofRatio = typeRatio * R.bipv.values.ratioFactor
-    roofDensity = R.bipv.values.kwPerSqm
+    roofRatio = typeRatio * config.roof.bipv.ratioFactor
+    roofDensity = config.roof.bipv.kwPerSqm
     roofLabel = 'BIPV 满铺'
   } else {
     const roofType = rawRoof || R.typicalRoof.values[buildingType] || '平屋面'
-    const cfg = R.roofTypes.values[roofType] ?? R.roofTypes.values.平屋面
+    const cfg = config.roof.types[roofType] ?? config.roof.types.平屋面
     roofRatio = typeRatio * cfg.ratioFactor
     roofDensity = cfg.kwPerSqm
     roofLabel = roofType
@@ -129,12 +130,12 @@ export const buildRecommendations = (
     : 28
   const coolingScore = clamp(Math.round(coolingBase + (isNew && coolingFits ? 15 : 0)))
   // 供冷面积按占比折净（扣车库/机房/后勤等非供冷区域），投资与冷负荷均按净口径
-  const coolingRatio = R.coolingAreaRatio.values[buildingType] ?? 1
+  const coolingRatio = config.cooling.areaRatio[buildingType] ?? 1
   const coolingScale = round1((area * coolingRatio) / 1e4)
-  const coolingKw = coolingDesignKw(coolingScale, buildingType)
+  const coolingKw = coolingDesignKw(coolingScale, buildingType, config)
 
   // ── 充电桩：类型客流代理推断，车位未知 → 置信度如实降级为待确认 ──
-  const pilesPer = R.chargerPilesPer10kSqm.values[buildingType] ?? 4
+  const pilesPer = config.charger.pilesPer10kSqm[buildingType] ?? 4
   const piles = Math.max(R.chargerMinPiles.values, Math.round((area / 1e4) * pilesPer))
   const chargerScore = clamp(Math.round((buildingType === '商场' ? 60 : 45) + (isNew ? 5 : 0)))
 
@@ -152,7 +153,7 @@ export const buildRecommendations = (
         `按 ${roofDensity} kW/㎡ 装机密度 → 建议约 ${pvKw} kW`,
         ...(isNew
           ? [
-              `新建按 BIPV 一体化满铺测算（覆盖率 ${R.bipv.values.ratioFactor} · 密度 ${R.bipv.values.kwPerSqm} kW/㎡），屋面即组件、增量成本低于既有加装`,
+              `新建按 BIPV 一体化满铺测算（覆盖率 ${config.roof.bipv.ratioFactor} · 密度 ${config.roof.bipv.kwPerSqm} kW/㎡），屋面即组件、增量成本低于既有加装`,
             ]
           : roofNote
             ? [roofNote]
@@ -195,7 +196,7 @@ export const buildRecommendations = (
           : `面积 ${area.toLocaleString()} ㎡ 低于经济门槛 ${coolingMin.toLocaleString()} ㎡，管网摊销偏高`,
         ...(coolingFits && coolingKw
           ? [
-              `折算设计冷负荷约 ${coolingKw} kW（负荷指标 ${R.coolingLoadIndex.values[buildingType]} W/㎡），供冷面积 ${coolingScale} 万㎡`,
+              `折算设计冷负荷约 ${coolingKw} kW（负荷指标 ${config.cooling.loadIndex[buildingType]} W/㎡），供冷面积 ${coolingScale} 万㎡`,
             ]
           : []),
         coolingFits

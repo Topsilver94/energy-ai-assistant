@@ -3,6 +3,8 @@
 //       → 专家参数：光伏造价 3.5→3.0 保存 → 组合投资 820→720 自动重算
 //       → 恢复默认 → 820 → 公开数据：广东电价 0.75→0.9 → 毛收益 234.1→262.5
 //         （储能收益按分省峰谷价差独立计，电价轴现只影响光伏收益与供冷购电成本）
+//       → 公开数据：办公屋面可用系数 0.4→0.5 → 模块① 推荐光伏 800→1000 kW 自动重算
+//         （屋面/供冷折算/充电桩配建参考表迁入公开抽屉后的联动回归）
 const { chromium } = require('playwright')
 const fs = require('fs')
 const path = require('path')
@@ -108,14 +110,37 @@ const dataCards = (page) =>
   await page.screenshot({ path: path.join(shotDir, 'm5-03-after-price.png'), fullPage: true })
   log('公开数据保存（广东电价 0.9）→ 自动重算')
 
-  // ── 6. 收尾恢复默认（不留脏状态给后续使用者）──
+  // ── 6. 公开数据：办公屋面可用系数 0.4 → 0.5 → 模块① 推荐光伏规模自动重算 ──
+  await page.locator('button:has-text("公开平台数据参考")').click()
+  await pub.waitFor({ timeout: 5000 })
+  const roofRow = pub
+    .locator('section:has(h4:text("屋面光伏参考")) div.grid', { hasText: /^办公/ })
+    .first()
+  await roofRow.locator('input[type="number"]').fill('0.5')
+  await pub.locator('button:has-text("保存配置")').click()
+  await page.waitForTimeout(600)
+  await page.locator('nav[aria-label="模块导航"] button:has-text("挖掘痛点")').click()
+  await page.waitForTimeout(400)
+  report.extracted.afterRoofChange = await page.evaluate(() => {
+    const body = document.body.textContent.replace(/\s+/g, ' ')
+    return { pv1000Kw: body.includes('建议约 1000 kW') }
+  })
+  await page.screenshot({ path: path.join(shotDir, 'm5-04-after-roof.png'), fullPage: true })
+  log('公开数据保存（办公屋面系数 0.5）→ 模块① 推荐光伏 800→1000 kW 重算')
+
+  // ── 7. 收尾恢复默认（不留脏状态给后续使用者）──
   await page.locator('button:has-text("公开平台数据参考")').click()
   await pub.waitFor({ timeout: 5000 })
   await pub.locator('button:has-text("恢复默认")').click()
   await pub.locator('button:has-text("保存配置")').click()
   await page.waitForTimeout(400)
   report.extracted.finalState = await dataCards(page)
-  log('已恢复默认系数')
+  await page.locator('nav[aria-label="模块导航"] button:has-text("挖掘痛点")').click()
+  await page.waitForTimeout(400)
+  report.extracted.finalRoofRestored = await page.evaluate(() =>
+    document.body.textContent.replace(/\s+/g, ' ').includes('建议约 800 kW'),
+  )
+  log('已恢复默认系数（模块① 推荐光伏回到 800 kW）')
 
   await browser.close()
   fs.writeFileSync(path.join(outDir, 'm5.json'), JSON.stringify(report, null, 2))

@@ -5,8 +5,7 @@ import { benchmarkTypes } from '../../data/benchmarks.js'
 import { recommendationRules } from '../../data/recommendationRules.js'
 import { useConfigStore } from '../../stores/configStore'
 
-// 屋面类型选项与典型值（规则表驱动，既有建筑的光伏规模推导用）
-const ROOF_OPTIONS = Object.keys(recommendationRules.roofTypes.values)
+// 典型屋面预选（推断逻辑，留规则表驱动）；屋面选项由 config 公开参考表 roof.types 派生
 const TYPICAL_ROOF = recommendationRules.typicalRoof.values
 
 // 建造年份滑杆范围（UI 边界，非计算系数）：上限取当前年份，跨年自动前滚（防腐化）
@@ -27,6 +26,7 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
   const config = useConfigStore((s) => s.config)
 
   const provinces = Object.keys(config.provinces)
+  const roofOptions = Object.keys(config.roof.types)
   const isNew = inputs.buildingNature === 'new'
   const benchmark = config.benchmarks[inputs.buildingType] ?? '—'
 
@@ -150,7 +150,7 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
               onChange={(e) => setInput({ roofType: e.target.value })}
               className={inputClass}
             >
-              {ROOF_OPTIONS.map((r) => (
+              {roofOptions.map((r) => (
                 <option key={r} value={r}>
                   {r}
                 </option>

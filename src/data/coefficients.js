@@ -8,6 +8,8 @@
  * 红线：每个系数必须带 source 字段；无真实官方来源的一律标注「演示假设值」。
  */
 
+import { benchmarkTypes } from './benchmarks.js'
+
 export const defaultConfig = {
   // 光伏（规模单位：kW，备案/并网/EPC 报价通行功率口径）
   pv: {
@@ -32,6 +34,9 @@ export const defaultConfig = {
     cop: 5.0, // 集中供冷高效机房 COP
     omRatioPerYear: 0.01,
     lifetimeYears: 20, // 能源站主体折旧年限
+    // 供冷折算参考（公开数据组）：模块① 集中供冷规模与冷负荷折算用，来源见下方 COOLING_*_SOURCE
+    areaRatio: { 办公: 0.8, 商场: 0.9, 医院: 0.8, 酒店: 0.7, 高校: 0.5, 数据中心: 1.0, 工业厂房: 0.4 },
+    loadIndex: { 办公: 100, 商场: 140, 医院: 100, 酒店: 90, 高校: 70, 数据中心: 600, 工业厂房: 80 }, // W/㎡
   },
   // 充电桩（规模单位：桩；净收益 = 年充电量 × 服务费 ×(1−平台抽成) − 场地等固定成本 − 运维）
   charger: {
@@ -42,6 +47,18 @@ export const defaultConfig = {
     siteCostPerPile: 8000, // 元/桩·年，场地租金 + 运营分摊（固定年成本）
     omRatioPerYear: 0.01, // 设备运维占初始投资比例
     lifetimeYears: 8, // 充电设备迭代快，按 8 年
+    // 配建参考（公开数据组）：模块① 充电桩规模推导用，来源见下方 CHARGER_PILES_SOURCE
+    pilesPer10kSqm: { 商场: 8, 酒店: 5, 办公: 4, 医院: 4, 高校: 4, 工业厂房: 4, 数据中心: 2 }, // 桩/万㎡
+  },
+  // 屋面光伏参考（公开数据组）：模块① 光伏规模推导用——可用系数按建筑类型，装机密度与折减按屋面形式
+  roof: {
+    usableRatio: { 办公: 0.4, 商场: 0.5, 医院: 0.35, 酒店: 0.3, 高校: 0.45, 数据中心: 0.3, 工业厂房: 0.65 },
+    types: {
+      平屋面: { ratioFactor: 1.0, kwPerSqm: 0.1 },
+      坡屋面: { ratioFactor: 0.7, kwPerSqm: 0.13 },
+      彩钢屋面: { ratioFactor: 1.0, kwPerSqm: 0.12 },
+    },
+    bipv: { ratioFactor: 0.9, kwPerSqm: 0.14 }, // 新建 BIPV 一体化满铺口径
   },
   // 分省参数：年等效利用小时 + 工商业电价 + 峰谷价差（面板按省分条列出）。
   // 覆盖大陆 31 个省级单位（22 省 + 5 自治区 + 4 直辖市），按华北→东北→华东→华中→华南→西南→西北排列；
@@ -107,6 +124,19 @@ const SPREAD_FALLBACK_SOURCE = `演示假设值：${SPREAD_AS_OF}代理购电表
 // 年运维比例 / 计算期的统一来源说明
 const OM_SOURCE = '演示假设值：年运维费占初始投资比例，按行业运维报价量级'
 const LIFE_SOURCE = (years, basis) => `演示假设值：计算期 ${years} 年（${basis}）`
+
+// ── 经验参考表（公开数据组）：屋面 / 供冷折算 / 充电桩配建——查表经验值，模块① 推荐引擎读取 ──
+const refField = (path, label, unit, step, source) => ({ path, label, unit, step, source })
+const ROOF_RATIO_SOURCE = '演示假设值：屋顶可用面积占建筑面积比例（低层大屋面商场高于高层办公/医院）'
+const ROOF_TYPE_SOURCE =
+  '演示假设值：屋面形式对可用比例与装机密度的影响（平屋面支架阵列留检修间距；坡屋面顺坡满铺密度高但仅计有效朝向坡面；彩钢夹具直贴），量级参考分布式设计手册典型区间'
+const BIPV_SOURCE =
+  '演示假设值：新建 BIPV 一体化满铺口径（屋面即组件，覆盖率与装机密度均高于支架式加装，增量成本低于既有加装）'
+const COOLING_RATIO_SOURCE =
+  '演示假设值：供冷面积占建筑面积比例（扣除车库/设备机房/后勤库房等非供冷区域），参考可研惯例区间取中值'
+const COOLING_INDEX_SOURCE =
+  '演示假设值：设计冷负荷指标（W/㎡，按供冷面积口径）参考《民用建筑供暖通风与空气调节设计规范》GB 50736 及设计手册典型区间；数据中心/工业厂房工艺差异大取中值'
+const CHARGER_PILES_SOURCE = '演示假设值：按建筑类型的充电桩配建水平（桩/万㎡），需车位与流量确认'
 
 // 分省参数面板区（scope: public）：按「利用小时 / 电价 / 峰谷价差」拆组，组内字段标签只留省名；
 // indexed: true 标记组内为省名字段 → 面板按拼音首字母分组渲染并挂右缘索引条；
@@ -358,5 +388,44 @@ export const coefficientSections = [
         source: '演示假设值：能源项目财务评价常用基准折现率 6%',
       },
     ],
+  },
+  {
+    scope: 'public',
+    title: '屋面光伏参考',
+    hint: '屋面可用系数按建筑类型，装机密度与可用折减按屋面形式；模块① 光伏规模推导用',
+    fields: [
+      ...benchmarkTypes.map((t) =>
+        refField(`roof.usableRatio.${t.key}`, `${t.label}可用系数`, '', 0.05, ROOF_RATIO_SOURCE),
+      ),
+      refField('roof.types.平屋面.ratioFactor', '平屋面·可用折减', '', 0.05, ROOF_TYPE_SOURCE),
+      refField('roof.types.平屋面.kwPerSqm', '平屋面·装机密度', 'kW/㎡', 0.01, ROOF_TYPE_SOURCE),
+      refField('roof.types.坡屋面.ratioFactor', '坡屋面·可用折减', '', 0.05, ROOF_TYPE_SOURCE),
+      refField('roof.types.坡屋面.kwPerSqm', '坡屋面·装机密度', 'kW/㎡', 0.01, ROOF_TYPE_SOURCE),
+      refField('roof.types.彩钢屋面.ratioFactor', '彩钢屋面·可用折减', '', 0.05, ROOF_TYPE_SOURCE),
+      refField('roof.types.彩钢屋面.kwPerSqm', '彩钢屋面·装机密度', 'kW/㎡', 0.01, ROOF_TYPE_SOURCE),
+      refField('roof.bipv.ratioFactor', 'BIPV·覆盖率', '', 0.05, BIPV_SOURCE),
+      refField('roof.bipv.kwPerSqm', 'BIPV·装机密度', 'kW/㎡', 0.01, BIPV_SOURCE),
+    ],
+  },
+  {
+    scope: 'public',
+    title: '供冷折算参考',
+    hint: '供冷面积占比与设计冷负荷指标（W/㎡），模块① 集中供冷规模与冷负荷折算用',
+    fields: [
+      ...benchmarkTypes.map((t) =>
+        refField(`cooling.areaRatio.${t.key}`, `${t.label}供冷占比`, '', 0.05, COOLING_RATIO_SOURCE),
+      ),
+      ...benchmarkTypes.map((t) =>
+        refField(`cooling.loadIndex.${t.key}`, `${t.label}负荷指标`, 'W/㎡', 10, COOLING_INDEX_SOURCE),
+      ),
+    ],
+  },
+  {
+    scope: 'public',
+    title: '充电桩配建参考',
+    hint: '按建筑类型的充电桩配建水平（桩/万㎡），模块① 充电桩规模推导用',
+    fields: benchmarkTypes.map((t) =>
+      refField(`charger.pilesPer10kSqm.${t.key}`, `${t.label}配建`, '桩/万㎡', 1, CHARGER_PILES_SOURCE),
+    ),
   },
 ]
