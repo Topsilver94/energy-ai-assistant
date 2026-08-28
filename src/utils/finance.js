@@ -71,8 +71,13 @@ const perType = (projectType, scale, province, config) => {
     const { storage } = config
     // 投资：scale(kWh) × 元/kWh ÷ 1e4
     const capex = (scale * storage.capexPerKWh) / 1e4
-    // 年放电量 = 容量(kWh) × 每日循环 × 365；套利收益 = 放电量 × 分省峰谷价差（元/kWh，公开数据项）
-    const dischargeKwh = scale * storage.cyclesPerDay * 365
+    // 年放电量按分省分时结构折算（循环判定读公开数据项 cyclesPerDay）：
+    // 一充一放 = 谷充峰放 1 次全额价差循环；两充两放省另加第二循环（平充峰放），
+    // 其有效价差约为全额峰谷价差一半，按等效循环 cycle2SpreadRatio 折算计入
+    const cyclesPerDay = prov.cyclesPerDay ?? 1
+    const effectiveCycles = 1 + (cyclesPerDay >= 2 ? (storage.cycle2SpreadRatio ?? 0) : 0)
+    // 年放电量 = 容量(kWh) × 等效每日循环 × 365；套利收益 = 放电量 × 分省峰谷价差（元/kWh，公开数据项）
+    const dischargeKwh = scale * effectiveCycles * 365
     return {
       capex,
       gross: (dischargeKwh * prov.peakValleySpread) / 1e4,

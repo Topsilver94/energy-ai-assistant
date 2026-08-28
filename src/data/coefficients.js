@@ -18,10 +18,11 @@ export const defaultConfig = {
     omRatioPerYear: 0.01, // 年运维费占初始投资比例
     lifetimeYears: 25, // 计算期，组件功率质保 25 年
   },
-  // 储能（规模单位：kWh，工商业储能柜通行能量口径）；套利收益按分省峰谷价差直接计（provinces.X.peakValleySpread，公开数据项）
+  // 储能（规模单位：kWh，工商业储能柜通行能量口径）；套利收益按分省峰谷价差 × 分时循环折算
+  //（价差与循环判定均为公开数据项：provinces.X.peakValleySpread / cyclesPerDay，不在全局写死循环次数）
   storage: {
     capexPerKWh: 1200, // 元/kWh，即 1.2 元/Wh
-    cyclesPerDay: 2, // 两充两放，峰谷套利典型策略
+    cycle2SpreadRatio: 0.5, // 两充两放省第二循环有效价差占全额峰谷价差比例（平充峰放：峰−平 ≈ 半额）
     omRatioPerYear: 0.02,
     lifetimeYears: 10, // 电芯质保 typical 10 年
   },
@@ -72,39 +73,41 @@ export const defaultConfig = {
   // 省内价区差异（如深圳 vs 广东其余、蒙西 vs 蒙东）不建模，取省量级，用户可在公开数据抽屉按项目地微调。
   // peakValleySpread 为真实数据：电网代理购电（一般工商业 1-10kV）峰谷价差，月份见下方 SPREAD_AS_OF 常量，
   // 取单一制与两部制标准档较高者、不含 1.5 倍上浮档（省内多价区如广东取珠三角五市档）；
-  // 未收录的 6 省按演示假设值兜底——来源见下方 SPREAD_SOURCE / SPREAD_FALLBACK_SOURCE
+  // 未收录的 6 省按演示假设值兜底——来源见下方 SPREAD_SOURCE / SPREAD_FALLBACK_SOURCE。
+  // cyclesPerDay 为分时结构判定（1=一充一放，2=两充两放；结构性事实而非可调经验系数）：
+  // 时段结构支持两充两放的 8 省取 2，其余保守按 1 计——来源见下方 CYCLES_SOURCE，统计窗口见 CYCLES_AS_OF
   provinces: {
-    北京: { sunHours: 1200, elecPrice: 0.8, peakValleySpread: 0.7248 },
-    天津: { sunHours: 1200, elecPrice: 0.78, peakValleySpread: 0.8378 },
-    上海: { sunHours: 1050, elecPrice: 0.85, peakValleySpread: 1.0937 },
-    重庆: { sunHours: 850, elecPrice: 0.68, peakValleySpread: 1.0816 },
-    河北: { sunHours: 1300, elecPrice: 0.65, peakValleySpread: 0.75 }, // 冀北 0.7175，取南网主体档
-    山西: { sunHours: 1350, elecPrice: 0.55, peakValleySpread: 0.4638 },
-    内蒙古: { sunHours: 1550, elecPrice: 0.5, peakValleySpread: 0.4676 }, // 蒙东档
-    辽宁: { sunHours: 1250, elecPrice: 0.65, peakValleySpread: 0.4352 },
-    吉林: { sunHours: 1300, elecPrice: 0.62, peakValleySpread: 0.6 }, // 演示假设值兜底
-    黑龙江: { sunHours: 1300, elecPrice: 0.6, peakValleySpread: 0.3071 },
-    江苏: { sunHours: 1100, elecPrice: 0.82, peakValleySpread: 0.6476 }, // 100kVA 及以上档
-    浙江: { sunHours: 1050, elecPrice: 0.85, peakValleySpread: 0.7849 },
-    安徽: { sunHours: 1100, elecPrice: 0.7, peakValleySpread: 0.8167 }, // 两部制档
-    福建: { sunHours: 1150, elecPrice: 0.68, peakValleySpread: 0.5379 },
-    江西: { sunHours: 1100, elecPrice: 0.7, peakValleySpread: 0.6134 },
-    山东: { sunHours: 1250, elecPrice: 0.7, peakValleySpread: 0.846 }, // 四档同值
-    河南: { sunHours: 1200, elecPrice: 0.68, peakValleySpread: 0.6 }, // 演示假设值兜底
-    湖北: { sunHours: 1050, elecPrice: 0.72, peakValleySpread: 0.5898 },
-    湖南: { sunHours: 1000, elecPrice: 0.72, peakValleySpread: 0.6 }, // 演示假设值兜底
-    广东: { sunHours: 1050, elecPrice: 0.75, peakValleySpread: 1.2655 }, // 珠三角五市档
-    广西: { sunHours: 1100, elecPrice: 0.65, peakValleySpread: 0.3629 },
-    海南: { sunHours: 1250, elecPrice: 0.8, peakValleySpread: 0.6 }, // 演示假设值兜底
-    四川: { sunHours: 850, elecPrice: 0.65, peakValleySpread: 0.631 }, // 两部制档
-    贵州: { sunHours: 950, elecPrice: 0.6, peakValleySpread: 0.7053 }, // 两部制档
-    云南: { sunHours: 1400, elecPrice: 0.55, peakValleySpread: 0.6 }, // 演示假设值兜底
-    西藏: { sunHours: 1900, elecPrice: 0.55, peakValleySpread: 0.6 }, // 演示假设值兜底
-    陕西: { sunHours: 1300, elecPrice: 0.6, peakValleySpread: 0.7315 }, // 两部制档，含/不含榆林同值
-    甘肃: { sunHours: 1500, elecPrice: 0.5, peakValleySpread: 0.1461 }, // 全国最低
-    青海: { sunHours: 1650, elecPrice: 0.45, peakValleySpread: 0.2818 },
-    宁夏: { sunHours: 1550, elecPrice: 0.45, peakValleySpread: 0.1557 },
-    新疆: { sunHours: 1500, elecPrice: 0.45, peakValleySpread: 0.2568 },
+    北京: { sunHours: 1200, elecPrice: 0.8, peakValleySpread: 0.7248, cyclesPerDay: 1 },
+    天津: { sunHours: 1200, elecPrice: 0.78, peakValleySpread: 0.8378, cyclesPerDay: 2 }, // 两充两放
+    上海: { sunHours: 1050, elecPrice: 0.85, peakValleySpread: 1.0937, cyclesPerDay: 1 },
+    重庆: { sunHours: 850, elecPrice: 0.68, peakValleySpread: 1.0816, cyclesPerDay: 1 },
+    河北: { sunHours: 1300, elecPrice: 0.65, peakValleySpread: 0.75, cyclesPerDay: 1 }, // 冀北 0.7175，取南网主体档
+    山西: { sunHours: 1350, elecPrice: 0.55, peakValleySpread: 0.4638, cyclesPerDay: 1 },
+    内蒙古: { sunHours: 1550, elecPrice: 0.5, peakValleySpread: 0.4676, cyclesPerDay: 1 }, // 蒙东档
+    辽宁: { sunHours: 1250, elecPrice: 0.65, peakValleySpread: 0.4352, cyclesPerDay: 1 },
+    吉林: { sunHours: 1300, elecPrice: 0.62, peakValleySpread: 0.6, cyclesPerDay: 2 }, // 演示假设值兜底；两充两放
+    黑龙江: { sunHours: 1300, elecPrice: 0.6, peakValleySpread: 0.3071, cyclesPerDay: 1 },
+    江苏: { sunHours: 1100, elecPrice: 0.82, peakValleySpread: 0.6476, cyclesPerDay: 2 }, // 100kVA 及以上档；两充两放
+    浙江: { sunHours: 1050, elecPrice: 0.85, peakValleySpread: 0.7849, cyclesPerDay: 2 }, // 两充两放
+    安徽: { sunHours: 1100, elecPrice: 0.7, peakValleySpread: 0.8167, cyclesPerDay: 1 }, // 两部制档
+    福建: { sunHours: 1150, elecPrice: 0.68, peakValleySpread: 0.5379, cyclesPerDay: 1 },
+    江西: { sunHours: 1100, elecPrice: 0.7, peakValleySpread: 0.6134, cyclesPerDay: 2 }, // 两充两放
+    山东: { sunHours: 1250, elecPrice: 0.7, peakValleySpread: 0.846, cyclesPerDay: 1 }, // 四档同值；深谷段结构未获名单确认，保守按一充一放
+    河南: { sunHours: 1200, elecPrice: 0.68, peakValleySpread: 0.6, cyclesPerDay: 1 }, // 演示假设值兜底
+    湖北: { sunHours: 1050, elecPrice: 0.72, peakValleySpread: 0.5898, cyclesPerDay: 2 }, // 两充两放
+    湖南: { sunHours: 1000, elecPrice: 0.72, peakValleySpread: 0.6, cyclesPerDay: 2 }, // 演示假设值兜底；两充两放
+    广东: { sunHours: 1050, elecPrice: 0.75, peakValleySpread: 1.2655, cyclesPerDay: 2 }, // 珠三角五市档；两充两放
+    广西: { sunHours: 1100, elecPrice: 0.65, peakValleySpread: 0.3629, cyclesPerDay: 1 },
+    海南: { sunHours: 1250, elecPrice: 0.8, peakValleySpread: 0.6, cyclesPerDay: 1 }, // 演示假设值兜底
+    四川: { sunHours: 850, elecPrice: 0.65, peakValleySpread: 0.631, cyclesPerDay: 1 }, // 两部制档
+    贵州: { sunHours: 950, elecPrice: 0.6, peakValleySpread: 0.7053, cyclesPerDay: 1 }, // 两部制档；二充窗口仅 1h，保守按一充一放
+    云南: { sunHours: 1400, elecPrice: 0.55, peakValleySpread: 0.6, cyclesPerDay: 1 }, // 演示假设值兜底
+    西藏: { sunHours: 1900, elecPrice: 0.55, peakValleySpread: 0.6, cyclesPerDay: 1 }, // 演示假设值兜底
+    陕西: { sunHours: 1300, elecPrice: 0.6, peakValleySpread: 0.7315, cyclesPerDay: 1 }, // 两部制档，含/不含榆林同值
+    甘肃: { sunHours: 1500, elecPrice: 0.5, peakValleySpread: 0.1461, cyclesPerDay: 1 }, // 全国最低
+    青海: { sunHours: 1650, elecPrice: 0.45, peakValleySpread: 0.2818, cyclesPerDay: 1 },
+    宁夏: { sunHours: 1550, elecPrice: 0.45, peakValleySpread: 0.1557, cyclesPerDay: 1 },
+    新疆: { sunHours: 1500, elecPrice: 0.45, peakValleySpread: 0.2568, cyclesPerDay: 1 },
   },
   // 通用系数
   general: {
@@ -113,10 +116,11 @@ export const defaultConfig = {
   },
 }
 
-// ── 数据日期常量（年更编辑点：峰谷价差换月只改 SPREAD_AS_OF、分省电价换年只改 ELECP_AS_OF，
-//    所有来源句与界面提示自动收敛，不再散落多处手改） ──
+// ── 数据日期常量（年更编辑点：峰谷价差换月只改 SPREAD_AS_OF、分省电价换年只改 ELECP_AS_OF、
+//    分时结构名单换版只改 CYCLES_AS_OF，所有来源句与界面提示自动收敛，不再散落多处手改） ──
 export const SPREAD_AS_OF = '2026年8月' // 峰谷价差：电网代理购电月度表所属月份
 export const ELECP_AS_OF = '2024–2025' // 分省电价：工商业购电水平大致区间
+export const CYCLES_AS_OF = '2025年1-7月' // 分时结构：分省两充两放名单所属统计窗口（建议按季度复核名单）
 
 // 分省参数的分组来源说明（各注各的，避免两组共用一条互相夹带无关半句）
 const PROVINCE_SUN_SOURCE = '演示假设值：利用小时参考中国气象局太阳能资源区划典型区间'
@@ -127,6 +131,9 @@ const SPREAD_SOURCE = `储能头条/国际能源网《${SPREAD_AS_OF}电网代�
 // 该月表未收录的省份 → 演示假设值兜底（红线：不编造数据），后续月度表出数后替换
 const SPREAD_MISSING = new Set(['吉林', '河南', '湖南', '海南', '云南', '西藏'])
 const SPREAD_FALLBACK_SOURCE = `演示假设值：${SPREAD_AS_OF}代理购电表未收录该省，暂按已收录 25 省中位水平取整 0.60 元/kWh 兜底`
+
+// 分时循环判定来源（真实数据，独立公开数据项）：按分时时段窗口逐省判定，非价差水平的推论
+const CYCLES_SOURCE = `中国能源研究会储能专委会/储能头条 2025 上半年分时电价盘点（${CYCLES_AS_OF}统计窗口）：时段结构支持两充两放的 8 省（浙江/广东/江苏/湖北/湖南/吉林/江西/天津）取 2，其余按一充一放保守计（贵州二充窗口仅 1 小时、山东深谷段结构未获名单确认，均计 1）；各省分时时段年内仍会调整，决策前需核当月文件`
 
 // 年运维比例 / 计算期的统一来源说明
 const OM_SOURCE = '演示假设值：年运维费占初始投资比例，按行业运维报价量级'
@@ -204,6 +211,15 @@ const provinceSections = [
       ),
     ),
   },
+  {
+    scope: 'public',
+    title: '分省分时结构',
+    hint: `一般工商业分时电价时段结构判定：2 = 支持两充两放（第二循环按折价计入收益），1 = 按一充一放；口径截至 ${CYCLES_AS_OF}，各省时段年内仍会调整`,
+    indexed: true,
+    fields: Object.keys(defaultConfig.provinces).map((prov) =>
+      provinceField(prov, 'cyclesPerDay', '次/天', 1, CYCLES_SOURCE),
+    ),
+  },
 ]
 
 // 专家参数面板的完整分组契约（benchmarks 分组在 data/benchmarks.js 中定义后并入）。
@@ -255,11 +271,12 @@ export const coefficientSections = [
         source: '演示假设值：2025 年工商业储能系统常见区间 800–1,200 元/kWh（即 0.8–1.2 元/Wh）',
       },
       {
-        path: 'storage.cyclesPerDay',
-        label: '每日充放循环',
-        unit: '次/天',
-        step: 1,
-        source: '行业惯例：两充两放（峰谷套利典型运行策略）',
+        path: 'storage.cycle2SpreadRatio',
+        label: '第二循环价差比（小数）',
+        unit: '',
+        step: 0.05,
+        source:
+          '演示假设值：两充两放省第二循环按平充峰放计，有效价差约为全额峰谷价差一半（峰−平 ≈ 半额）；循环次数按分省分时结构判定（公开数据抽屉），不在此全局设定',
       },
       {
         path: 'storage.omRatioPerYear',

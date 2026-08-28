@@ -58,13 +58,14 @@ const log = (m) => {
   })
 
   // 储能定容双口径（既有·变压器留空 → 推定 20000㎡×80VA/㎡=1600kVA → 1600×25%×2h=800；
-  // 负荷口径 日均 7306kWh×0.35=2557，短板 800）+ 布置红线双出口之推荐侧
+  // 负荷口径 日均 7306kWh×0.35=2557，短板 800）+ 广东两充两放运行模式行 + 布置红线双出口之推荐侧
   report.extracted.storageSizing = await page.evaluate(() => {
     const body = document.body.textContent.replace(/\s+/g, ' ')
     return {
       hasLoadCaliber: body.includes('负荷口径：日均用电 7,306 kWh'),
       hasTrafoCaliber: body.includes('变压器口径：按办公 80 VA/㎡ 推定约 1,600 kVA'),
       hasShortfall: body.includes('按短板定容约 800 kWh'),
+      hasTwoCycleMode: body.includes('广东分时结构支持两充两放（谷充峰放全额价差 + 平充峰放约半额价差）'),
       hasFireLine: body.includes('布置红线：户外电池舱（柜）间防火间距 ≥3 m'),
     }
   })

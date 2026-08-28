@@ -22,7 +22,8 @@ export const recommendationRules = {
   },
   storageStrongSpread: {
     values: 0.7,
-    source: '演示假设值：峰谷价差 ≥ 0.7 元/kWh 视为储能两充两放经济边界',
+    source:
+      '演示假设值：峰谷价差 ≥ 0.7 元/kWh 视为储能套利优选区间（是否两充两放按分省分时结构判定，非价差阈值推论）',
   },
   storageToPvRatio: {
     values: 0.5,

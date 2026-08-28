@@ -132,11 +132,13 @@ export const buildRecommendations = (
   )
   const roofRatioText = Math.round(roofRatio * 100) / 100
 
-  // ── 储能：峰谷价差直读分省公开数据（代理购电月度表，日期随 coefficients.js 的 SPREAD_AS_OF 常量）；
+  // ── 储能：峰谷价差直读分省公开数据（代理购电月度表，日期随 coefficients.js 的 SPREAD_AS_OF 常量），
+  //    运行模式按分省分时结构判定（provinces.X.cyclesPerDay，公开数据项，与财务口径同源）；
   //    定容双口径取短板：负荷消纳（年电量→日均×峰段可转移系数）× 变压器接入（实填或推定容量×功率占比×小时数），
   //    新建无负荷数据按光储配比兜底 ──
   const spread = prov.peakValleySpread
   const strongSpread = spread >= R.storageStrongSpread.values
+  const cyclesPerDay = prov.cyclesPerDay ?? 1
   const SS = config.storageSizing
   const annualKwh = Number(rawAnnualConsumption)
   let storageKwh
@@ -224,8 +226,11 @@ export const buildRecommendations = (
       confidence: 'medium',
       reasons: [
         `当地一般工商业峰谷价差 ${spread.toFixed(2)} 元/kWh（${SPREAD_AS_OF}代理购电口径）`,
+        cyclesPerDay >= 2
+          ? `${province}分时结构支持两充两放（谷充峰放全额价差 + 平充峰放约半额价差），推荐全额峰谷套利模式`
+          : `${province}分时结构按一充一放测算（谷充峰放全额价差），可叠加需量管理增厚收益`,
         strongSpread
-          ? '价差达到两充两放经济边界，优先级高'
+          ? '价差进入套利优选区间，优先级高'
           : '价差一般，收益依赖充放策略精细化',
         ...(STEADY_LOAD_TYPES.includes(buildingType)
           ? [`${buildingType}全天负荷平稳，储能利用率高`]

@@ -39,7 +39,10 @@ const keyParams = (systems, config, province) => {
     if (t.key === 'storage') {
       rows.push(
         ['储能单位造价', `${config.storage.capexPerKWh} 元/kWh`],
-        ['每日循环', `${config.storage.cyclesPerDay} 次`],
+        [
+          '分时结构',
+          `${prov.cyclesPerDay >= 2 ? '两充两放（第二循环按约半额价差折算）' : '一充一放'}（${province}）`,
+        ],
       )
     }
     if (t.key === 'cooling') {

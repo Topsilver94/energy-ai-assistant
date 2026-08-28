@@ -69,6 +69,12 @@ export const buildPrompt = (project, diagnosis, config) => {
   const phasing = buildPhasing(items, f)
   // 敏感性结论：系统单变量扰动重算（同页面敏感性表），同规注入——仅润色不改数字
   const sens = buildSensitivity(project.inputs, config)
+  // 储能运行模式：分省分时结构判定（确定性内容，同模块① 触发依据；收益数字已按此口径计算）
+  const storageCycles = config.provinces?.[project.inputs.province]?.cyclesPerDay ?? 1
+  const storageModeLine =
+    storageCycles >= 2
+      ? `运行模式：${project.inputs.province}分时结构支持两充两放，第二循环按约半额价差折算（收益已按此口径计算）`
+      : `运行模式：${project.inputs.province}分时结构按一充一放测算，可叠加需量管理增厚收益`
 
   const user =
     '请根据以下项目数据生成一份 1 页式综合能源改造方案：\n\n' +
@@ -85,7 +91,8 @@ export const buildPrompt = (project, diagnosis, config) => {
     (itemLines || '—') +
     '\n\n' +
     (selected.some((t) => t.key === 'storage')
-      ? '【储能布置红线（确定性内容，请保留标准号与数字，仅润色措辞）】\n' +
+      ? '【储能运行与布置（确定性内容，请保留标准号与数字，仅润色措辞）】\n' +
+        `${storageModeLine}\n` +
         `${STORAGE_FIRE_LINE}\n\n`
       : '') +
     '【敏感性分析（系统按单变量扰动确定性重算，请保留全部数字与结论，仅润色措辞）】\n' +
