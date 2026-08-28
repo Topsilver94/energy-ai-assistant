@@ -118,7 +118,7 @@ const log = (m) => {
   await page.screenshot({ path: path.join(shotDir, 'm2-04-new-blank.png'), fullPage: true })
   log('场景B-2 新建留空（按约束值预估）完成')
 
-  // ── 场景C：既有工业厂房（扩类型回归：基准180电费全口径、大屋面光伏、措施文案、热力图位置） ──
+  // ── 场景C：既有工业厂房（扩类型回归：基准180电费全口径、大屋面光伏、措施文案、热力图位置、供冷置信度降级标注） ──
   await page.locator('button:has-text("既有建筑")').click()
   await page.locator('select').first().selectOption('工业厂房')
   await page.locator('input[placeholder="如 10000"]').fill('20000')
@@ -133,6 +133,7 @@ const log = (m) => {
       chipCount: chips.length,
       hasHeatmap: document.body.textContent.includes('投资价值热力图'),
       hasPvHighScore: document.body.textContent.includes('分布式光伏'),
+      coolingVerifyNote: document.body.textContent.includes('需工艺负荷资料复核'),
     }
   })
   await page.screenshot({ path: path.join(shotDir, 'm2-05-industrial.png'), fullPage: true })

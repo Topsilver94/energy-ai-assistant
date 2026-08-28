@@ -133,6 +133,8 @@ export const buildRecommendations = (
   const coolingRatio = config.cooling.areaRatio[buildingType] ?? 1
   const coolingScale = round1((area * coolingRatio) / 1e4)
   const coolingKw = coolingDesignKw(coolingScale, buildingType, config)
+  // 工业厂房冷负荷以工艺发热为主，面积指标先天粗糙 → 置信度如实降级，待工艺资料复核
+  const coolingVerify = buildingType === '工业厂房'
 
   // ── 充电桩：类型客流代理推断，车位未知 → 置信度如实降级为待确认 ──
   const pilesPer = config.charger.pilesPer10kSqm[buildingType] ?? 4
@@ -189,7 +191,7 @@ export const buildRecommendations = (
       score: coolingScore,
       level: levelOf(coolingScore),
       suggestedScale: coolingScale,
-      confidence: 'high',
+      confidence: coolingVerify ? 'verify' : 'high',
       reasons: [
         coolingFits
           ? `${buildingType}建筑冷负荷稳定，面积 ${area.toLocaleString()} ㎡ ≥ 经济门槛 ${coolingMin.toLocaleString()} ㎡`
@@ -197,6 +199,11 @@ export const buildRecommendations = (
         ...(coolingFits && coolingKw
           ? [
               `折算设计冷负荷约 ${coolingKw} kW（负荷指标 ${config.cooling.loadIndex[buildingType]} W/㎡），供冷面积 ${coolingScale} 万㎡`,
+            ]
+          : []),
+        ...(coolingVerify
+          ? [
+              `工业冷负荷以工艺发热为主，负荷指标 ${config.cooling.loadIndex[buildingType]} W/㎡ 仅作量级粗估，需工艺负荷资料复核`,
             ]
           : []),
         coolingFits

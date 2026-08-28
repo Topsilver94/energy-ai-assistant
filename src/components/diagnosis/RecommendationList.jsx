@@ -13,7 +13,7 @@ const LEVEL_TONES = {
 const CONFIDENCE = {
   high: { label: '高', title: '面积/类型数据直接推导' },
   medium: { label: '中', title: '方向可推，规模需负荷数据修正' },
-  verify: { label: '待确认', title: '类型代理推断，需车位/流量确认' },
+  verify: { label: '待确认', title: '类型代理推断，需车位/流量或工艺负荷资料确认' },
 }
 
 /**
