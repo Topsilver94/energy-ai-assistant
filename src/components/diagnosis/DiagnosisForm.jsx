@@ -161,9 +161,10 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
         )}
       </div>
 
-      {/* 电费兜底提示放双栏网格下方通栏（不占右列高度，保证左右输入框下边缘对齐） */}
+      {/* 电费兜底提示放双栏网格下方通栏（不占右列高度，保证左右输入框下边缘对齐）；
+          居右与电费输入框右边缘对齐 */}
       {!isNew && (
-        <p className="-mt-1 text-[11px] text-paper-mute">
+        <p className="-mt-1 text-right text-[11px] text-paper-mute">
           电费留空则按典型强度 / 变压器口径预估（结果挂「预估」标注）
         </p>
       )}
