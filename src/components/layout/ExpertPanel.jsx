@@ -8,11 +8,32 @@ import { useConfigStore, buildDefaultConfig } from '../../stores/configStore'
 import { getByPath, setByPath } from '../../utils/path'
 import Button from '../ui/Button'
 
-// 组内来源全一致时提升为组级展示（类目标题下方一条），字段行不再逐条重复；
-// 部分一致的组保持逐字段。数据契约里每个字段仍带 source（红线不破）
-const sharedSource = (section) => {
-  const list = section.fields.map((f) => f.source)
-  return list.every((x) => x === list[0]) ? list[0] : null
+// 来源整合（抽屉叙事约定：单项类型下的重复标注整合到类目下方，保持简洁叙事）：
+//   1. 组内众数来源提升为组级一条（覆盖 ≥2 个字段才提升，全异组不硬提）；
+//   2. 其余字段按「连续同来源」分段、段末一条，字段行只留标签与数值；
+//   3. 分省组保持逐行平铺（兜底省与真实数据省交错，逐行标注是刻意为之），
+//      仅把众数来源收编组级、偏离众数的行保留行级来源。
+// 数据契约里每个字段仍带 source（红线不破）
+const dominantSource = (fields) => {
+  let best = { source: null, n: 0 }
+  const seen = new Map()
+  fields.forEach((f) => {
+    const n = (seen.get(f.source) ?? 0) + 1
+    seen.set(f.source, n)
+    if (n > best.n) best = { source: f.source, n } // 严格大于：并列取先出现者
+  })
+  return best.n >= 2 ? best.source : null
+}
+
+// 连续同来源分段（非分省组）：[{ source, rows }]，rows 为该段字段行
+const segmentRows = (rows) => {
+  const segs = []
+  rows.forEach((row) => {
+    const last = segs[segs.length - 1]
+    if (last && last.source === row.field.source) last.rows.push(row)
+    else segs.push({ source: row.field.source, rows: [row] })
+  })
+  return segs
 }
 
 // 数值化：输入框存的是字符串，保存时转数字；非法/空值回退为当前 store 值
@@ -217,7 +238,7 @@ export default function ExpertPanel({ open, onClose, scope = 'expert' }) {
             className={`h-full overflow-y-auto py-4 ${hasIndexed ? 'pl-6 pr-12' : 'px-6'}`}
           >
             {sections.map((section, i) => {
-              const shared = sharedSource(section)
+              const dominant = dominantSource(section.fields)
               // 分省组：按拼音首字母分组，每组首行挂字母锚点（右缘索引条定位用，列表内不渲染字母头）
               const rows = section.indexed
                 ? groupFieldsByInitial(section.fields).flatMap(({ letter, fields }) =>
@@ -244,49 +265,88 @@ export default function ExpertPanel({ open, onClose, scope = 'expert' }) {
                   {section.hint}
                 </p>
               )}
-              {/* 组级来源：组内 source 全一致时仅此一条，字段行不再逐条重复 */}
-              {shared && (
+              {/* 组级来源：组内众数来源仅此一条（覆盖 ≥2 字段才提升） */}
+              {dominant && (
                 <p
                   className="mb-1 mt-1 line-clamp-2 text-[11px] leading-snug text-paper-mute/80"
-                  title={shared}
+                  title={dominant}
                 >
-                  来源：{shared}
+                  来源：{dominant}
                 </p>
               )}
               <div>
-                {rows.map((row) => (
-                  <div
-                    key={row.key}
-                    id={row.letter ? `expert-letter-${scope}-${i}-${row.letter}` : undefined}
-                    className="grid grid-cols-[1fr_162px] items-center gap-3 border-b border-line/40 py-2.5 last:border-0"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm text-paper">{row.field.label}</p>
-                      {!shared && (
-                        <p
-                          className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-paper-mute/80"
-                          title={row.field.source}
-                        >
-                          {row.field.source}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="number"
-                        step={row.field.step}
-                        value={String(getByPath(draft, row.field.path) ?? '')}
-                        onChange={(e) =>
-                          setDraft((d) => setByPath(d, row.field.path, e.target.value))
-                        }
-                        className="tabular w-full rounded-xl bg-ink-raised px-3 py-1.5 text-right font-mono text-sm text-paper outline-none transition-shadow focus:ring-2 focus:ring-volt"
-                      />
-                      <span className="w-14 shrink-0 text-[11px] leading-tight text-paper-mute">
-                        {row.field.unit}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                {section.indexed
+                  ? // 分省组：逐行平铺，仅偏离众数来源的行（兜底省）保留行级标注
+                    rows.map((row) => (
+                      <div
+                        key={row.key}
+                        id={row.letter ? `expert-letter-${scope}-${i}-${row.letter}` : undefined}
+                        className="grid grid-cols-[1fr_162px] items-center gap-3 border-b border-line/40 py-2.5 last:border-0"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm text-paper">{row.field.label}</p>
+                          {row.field.source !== dominant && (
+                            <p
+                              className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-paper-mute/80"
+                              title={row.field.source}
+                            >
+                              {row.field.source}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="number"
+                            step={row.field.step}
+                            value={String(getByPath(draft, row.field.path) ?? '')}
+                            onChange={(e) =>
+                              setDraft((d) => setByPath(d, row.field.path, e.target.value))
+                            }
+                            className="tabular w-full rounded-xl bg-ink-raised px-3 py-1.5 text-right font-mono text-sm text-paper outline-none transition-shadow focus:ring-2 focus:ring-volt"
+                          />
+                          <span className="w-14 shrink-0 text-[11px] leading-tight text-paper-mute">
+                            {row.field.unit}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  : // 非分省组：连续同来源分段收编，段末一条来源（众数段已被组级行覆盖，不再重复）
+                    segmentRows(rows).map((seg) => (
+                      <div key={seg.rows[0].key}>
+                        {seg.rows.map((row) => (
+                          <div
+                            key={row.key}
+                            className="grid grid-cols-[1fr_162px] items-center gap-3 border-b border-line/40 py-2.5 last:border-0"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate text-sm text-paper">{row.field.label}</p>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="number"
+                                step={row.field.step}
+                                value={String(getByPath(draft, row.field.path) ?? '')}
+                                onChange={(e) =>
+                                  setDraft((d) => setByPath(d, row.field.path, e.target.value))
+                                }
+                                className="tabular w-full rounded-xl bg-ink-raised px-3 py-1.5 text-right font-mono text-sm text-paper outline-none transition-shadow focus:ring-2 focus:ring-volt"
+                              />
+                              <span className="w-14 shrink-0 text-[11px] leading-tight text-paper-mute">
+                                {row.field.unit}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                        {seg.source !== dominant && (
+                          <p
+                            className="mb-2 line-clamp-2 text-[11px] leading-snug text-paper-mute/80"
+                            title={seg.source}
+                          >
+                            {seg.source}
+                          </p>
+                        )}
+                      </div>
+                    ))}
               </div>
             </section>
             )
