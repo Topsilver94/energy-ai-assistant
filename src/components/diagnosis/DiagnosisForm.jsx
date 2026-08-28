@@ -93,7 +93,7 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
 
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
-          <span className="mb-1.5 flex items-baseline justify-between text-[13px] text-paper-mute">
+          <span className="mb-1.5 flex h-5 items-center justify-between text-[13px] text-paper-mute">
             建筑面积 <span className="font-mono text-[12px]">单位：㎡</span>
           </span>
           <input
@@ -109,7 +109,7 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
 
         {isNew ? (
           <label className="block">
-            <span className="mb-1.5 flex items-baseline justify-between text-[13px] text-paper-mute">
+            <span className="mb-1.5 flex h-5 items-center justify-between text-[13px] text-paper-mute">
               设计能耗强度 <span className="font-mono text-[12px]">kWh/㎡·a</span>
             </span>
             <input
@@ -124,10 +124,11 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
           </label>
         ) : (
           <label className="block">
-            <span className="mb-1.5 flex items-baseline justify-between text-[13px] text-paper-mute">
+            <span className="mb-1.5 flex h-5 items-center justify-between text-[13px] text-paper-mute">
               {inputs.feePeriod === 'monthly' ? '月均电费' : '年度电费'}
-              {/* 按年/按月口径切换：客户记得「一个月十几万」往往比年度账单容易 */}
-              <span className="flex items-center gap-0.5 rounded-full border border-line bg-ink-raised p-0.5 font-mono text-[11px]">
+              {/* 按年/按月口径切换：客户记得「一个月十几万」往往比年度账单容易；
+                  容器限高 h-5 与左侧标签行等高，保证双栏输入框上下边缘对齐 */}
+              <span className="flex h-5 items-center gap-0.5 rounded-full border border-line bg-ink-raised px-0.5 font-mono text-[11px]">
                 {[
                   { key: 'annual', label: '按年' },
                   { key: 'monthly', label: '按月' },
@@ -136,7 +137,7 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
                     key={p.key}
                     type="button"
                     onClick={() => setInput({ feePeriod: p.key })}
-                    className={`rounded-full px-2 py-0.5 transition-colors ${
+                    className={`rounded-full px-2 leading-none transition-colors ${
                       inputs.feePeriod === p.key
                         ? 'bg-volt font-semibold text-ink'
                         : 'text-paper-mute hover:text-paper'
@@ -156,12 +157,16 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
               onChange={(e) => setInput({ annualElectricityFee: e.target.value })}
               className={`${inputClass} font-mono`}
             />
-            <span className="mt-1 block text-[11px] text-paper-mute">
-              留空则按典型强度 / 变压器口径预估
-            </span>
           </label>
         )}
       </div>
+
+      {/* 电费兜底提示放双栏网格下方通栏（不占右列高度，保证左右输入框下边缘对齐） */}
+      {!isNew && (
+        <p className="-mt-1 text-[11px] text-paper-mute">
+          电费留空则按典型强度 / 变压器口径预估（结果挂「预估」标注）
+        </p>
+      )}
 
       {/* 屋面类型 / 变压器容量（仅既有）：屋面业主一眼可知；变压器容量在供电合同上，
           初次接触未必拿得到——留空按分类型配变指标推定（见公开抽屉·储能定容参考） */}
