@@ -6,7 +6,7 @@
 // 场景B 新建办公：20000㎡ · 设计强度120（> 约束100 → 超标）；再测留空（按约束值预估）
 //   预期：不输出节能潜力
 // 场景D 既有商场 20000㎡：集中供冷双口径回归
-//   预期：占比0.9 → 供冷面积1.8万㎡ · 折算设计冷负荷2520kW（负荷指标140 W/㎡）
+//   预期：占比0.9 → 供冷面积1.8万㎡ · 折算设计冷负荷3600kW（负荷指标200 W/㎡，手册区间中值）
 // 场景E 屋面类型分支：既有办公·坡屋面 → 728kW；新建办公 → BIPV满铺 1008kW（平屋面典型=场景A 800kW）
 const { chromium } = require('playwright')
 const fs = require('fs')
@@ -146,8 +146,8 @@ const log = (m) => {
   await page.waitForTimeout(600)
   const mallBody = await page.evaluate(() => document.body.textContent.replace(/\s+/g, ' '))
   report.extracted.mallDualCaliber = {
-    hasKw: mallBody.includes('折算设计冷负荷约 2520 kW'),
-    hasIndex: mallBody.includes('负荷指标 140 W/㎡'),
+    hasKw: mallBody.includes('折算设计冷负荷约 3600 kW'),
+    hasIndex: mallBody.includes('负荷指标 200 W/㎡'),
     hasNetArea: mallBody.includes('供冷面积 1.8 万㎡'),
     hasRatioNote: mallBody.includes('建筑面积 × 0.9 折算'),
   }
