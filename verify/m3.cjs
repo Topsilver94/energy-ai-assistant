@@ -49,7 +49,7 @@ const log = (m) => {
   // ── 2. 完成②：既有办公 20000㎡ / 电费200万 ──
   await page.locator('nav[aria-label="模块导航"] button:has-text("挖掘痛点")').click()
   await page.locator('input[placeholder="如 10000"]').fill('20000')
-  await page.locator('input[placeholder="如 80"]').fill('200')
+  await page.locator('input[placeholder^="留空按典型强度"]').fill('200')
   await page.locator('button:has-text("开始诊断")').click()
   await page.locator('text=节能潜力').first().waitFor({ timeout: 5000 })
   log('模块① 完成')

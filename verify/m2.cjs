@@ -1,13 +1,13 @@
 // 全链路验证脚本 · 模块① 挖掘痛点（工作模式，经 WorkNav 切页）
 // 场景A 既有办公：20000㎡ · 2010年 · 年电费200万 · 广东
-//   预期：强度133.3 / 潜力25.0%（基准100，商务办公口径）/ 评级需改进 / 推荐分 储72(可考虑,800kWh 双口径定容) Pv60(可考虑,800kW) 桩45(8桩) 冷28
+//   预期：强度133.3 / 潜力25.0%（基准100，商务办公口径）/ 评级需改进 / 推荐分 储72(可考虑,800kWh 双口径定容) Pv45(谨慎,200kW·可用系数重标保守端) 桩45(8桩) 冷28
 //         （储能按广东 2026年8月 实际峰谷价差 1.2655 元/kWh 判定，升至可考虑档并居首；25%<30% 措施不再标重点）
-//   一键填入 → 模块② 表单变为 pv=800 与 storage=800 启用（可考虑档全采纳）、其余关闭
+//   一键填入 → 模块② 仅 storage=800 启用（pv 掉至谨慎档不再自动采纳，卡上 amber 徽章仍可见）
 // 场景B 新建办公：20000㎡ · 设计强度120（> 约束100 → 超标）；再测留空（按约束值预估）
 //   预期：不输出节能潜力
 // 场景D 既有商场 20000㎡：集中供冷双口径回归
 //   预期：占比0.9 → 供冷面积1.8万㎡ · 折算设计冷负荷3600kW（负荷指标200 W/㎡，手册区间中值）
-// 场景E 屋面类型分支：既有办公·坡屋面 → 728kW；新建办公 → BIPV满铺 1008kW（平屋面典型=场景A 800kW）
+// 场景E 屋面类型分支：既有办公·坡屋面 → 182kW 触 200kW 下限；新建办公 → BIPV满铺 252kW（平屋面典型=场景A 200kW）
 // 场景F 电费未知兜底：F1 留空 → 面积口径 115×20000=230万kWh → 潜力 13.0%（预估标注）
 //   F2 变压器实填 1100kVA → 变压器口径 216.8万 < 面积口径 230万 → 取短板，强度 108.4
 //   F3 月均电费 16万 → 年 192万 ÷ 0.75 = 256万kWh → 强度 128.0，转实测口径（预估卡消失）
@@ -180,7 +180,7 @@ const log = (m) => {
   report.extracted.roofSlope = await page.evaluate(() => {
     const body = document.body.textContent.replace(/\s+/g, ' ')
     return {
-      has728Kw: body.includes('建议约 728 kW'),
+      has200Kw: body.includes('建议约 200 kW'),
       hasSlopeNote: body.includes('坡屋面顺坡满铺'),
     }
   })
@@ -191,7 +191,7 @@ const log = (m) => {
   report.extracted.roofBipv = await page.evaluate(() => {
     const body = document.body.textContent.replace(/\s+/g, ' ')
     return {
-      has1008Kw: body.includes('建议约 1008 kW'),
+      has252Kw: body.includes('建议约 252 kW'),
       hasBipvNote: body.includes('新建按 BIPV 一体化满铺测算'),
       noRoofSelect: document.querySelectorAll('select').length === 2, // 仅 类型 + 省份
     }

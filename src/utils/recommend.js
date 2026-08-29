@@ -103,7 +103,8 @@ export const buildRecommendations = (
 
   // ── 光伏：屋面条件推导——既有按屋面类型（平/坡/彩钢，未选按类型典型值），
   //    新建不问屋面（设计未定）直接按 BIPV 一体化满铺口径；规模 kW（备案/并网通行） ──
-  const typeRatio = config.roof.usableRatio[buildingType] ?? 0.4
+  // 类型未知（不在基准表内）时按混合形态中位保守取值，与 usableRatio 重标口径一致
+  const typeRatio = config.roof.usableRatio[buildingType] ?? 0.15
   let roofRatio
   let roofDensity
   let roofLabel
