@@ -125,7 +125,7 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
         ) : (
           <label className="block">
             <span className="mb-1.5 flex h-5 items-center justify-between text-[13px] text-paper-mute">
-              {inputs.feePeriod === 'monthly' ? '月均电费' : '年度电费'}
+              {inputs.feePeriod === 'monthly' ? '月均电费' : '年度电费'} · 万元
               {/* 按年/按月口径切换：客户记得「一个月十几万」往往比年度账单容易；
                   容器限高 h-5 与左侧标签行等高，保证双栏输入框上下边缘对齐 */}
               <span className="flex h-5 items-center gap-0.5 rounded-full border border-line bg-ink-raised px-0.5 font-mono text-[11px]">
@@ -152,7 +152,7 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
               type="number"
               min="0"
               step="any"
-              placeholder={inputs.feePeriod === 'monthly' ? '如 7' : '如 80'}
+              placeholder="留空按典型强度/变压器预估"
               value={inputs.annualElectricityFee}
               onChange={(e) => setInput({ annualElectricityFee: e.target.value })}
               className={`${inputClass} font-mono`}
@@ -160,14 +160,6 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
           </label>
         )}
       </div>
-
-      {/* 电费兜底提示放双栏网格下方通栏（不占右列高度，保证左右输入框下边缘对齐）；
-          居右与电费输入框右边缘对齐 */}
-      {!isNew && (
-        <p className="-mt-1 text-right text-[11px] text-paper-mute">
-          电费留空则按典型强度 / 变压器口径预估
-        </p>
-      )}
 
       {/* 屋面类型 / 变压器容量（仅既有）：屋面业主一眼可知；变压器容量在供电合同上，
           初次接触未必拿得到——留空按分类型配变指标推定（见公开抽屉·储能定容参考） */}

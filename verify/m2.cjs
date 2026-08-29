@@ -40,7 +40,7 @@ const log = (m) => {
   log('切换到模块①')
 
   await page.locator('input[placeholder="如 10000"]').fill('20000')
-  await page.locator('input[placeholder="如 80"]').fill('200')
+  await page.locator('input[placeholder^="留空按典型强度"]').fill('200')
   await page.locator('button:has-text("开始诊断")').click()
   await page.waitForTimeout(600)
   await page.screenshot({ path: path.join(shotDir, 'm2-01-existing.png'), fullPage: true })
@@ -138,7 +138,7 @@ const log = (m) => {
   await page.locator('button:has-text("既有建筑")').click()
   await page.locator('select').first().selectOption('工业厂房')
   await page.locator('input[placeholder="如 10000"]').fill('20000')
-  await page.locator('input[placeholder="如 80"]').fill('200')
+  await page.locator('input[placeholder^="留空按典型强度"]').fill('200')
   await page.locator('button:has-text("开始诊断")').click()
   await page.waitForTimeout(600)
   report.extracted.industrial = await page.evaluate(() => {
@@ -158,7 +158,7 @@ const log = (m) => {
   // ── 场景D：既有商场（集中供冷双口径：占比折净 + 冷量折算） ──
   await page.locator('select').first().selectOption('商场')
   await page.locator('input[placeholder="如 10000"]').fill('20000')
-  await page.locator('input[placeholder="如 80"]').fill('200')
+  await page.locator('input[placeholder^="留空按典型强度"]').fill('200')
   await page.locator('button:has-text("开始诊断")').click()
   await page.waitForTimeout(600)
   const mallBody = await page.evaluate(() => document.body.textContent.replace(/\s+/g, ' '))
@@ -203,7 +203,7 @@ const log = (m) => {
   await page.locator('button:has-text("既有建筑")').click()
   await page.locator('select').first().selectOption('办公')
   await page.locator('input[placeholder="如 10000"]').fill('20000')
-  await page.locator('input[placeholder="如 80"]').fill('')
+  await page.locator('input[placeholder^="留空按典型强度"]').fill('')
   await page.locator('input[placeholder="留空按类型指标推定"]').fill('')
   await page.locator('button:has-text("开始诊断")').click()
   await page.waitForTimeout(600)
@@ -236,7 +236,7 @@ const log = (m) => {
 
   // F-3：切按月口径，月均 16 万 → 年 192 万 ÷ 0.75 = 256万 kWh → 强度 128.0，转实测（预估卡消失）
   await page.locator('button:has-text("按月")').click()
-  await page.locator('input[placeholder="如 7"]').fill('16')
+  await page.locator('input[placeholder^="留空按典型强度"]').fill('16')
   await page.locator('button:has-text("开始诊断")').click()
   await page.waitForTimeout(600)
   report.extracted.feeMonthly = await page.evaluate(() => {
