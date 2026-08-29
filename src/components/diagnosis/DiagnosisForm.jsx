@@ -125,19 +125,19 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
         ) : (
           <label className="block">
             <span className="mb-1.5 flex h-5 items-center justify-between text-[13px] text-paper-mute">
-              {inputs.feePeriod === 'monthly' ? '月均电费' : '年度电费'} · 万元
+              {inputs.feePeriod === 'monthly' ? '月均电费·万元' : '年度电费·万元'}
               {/* 按年/按月口径切换：客户记得「一个月十几万」往往比年度账单容易；
                   容器限高 h-5 与左侧标签行等高，保证双栏输入框上下边缘对齐 */}
               <span className="flex h-5 items-center gap-0.5 rounded-full border border-line bg-ink-raised px-0.5 font-mono text-[11px]">
                 {[
-                  { key: 'annual', label: '按年' },
-                  { key: 'monthly', label: '按月' },
+                  { key: 'annual', label: '年' },
+                  { key: 'monthly', label: '月' },
                 ].map((p) => (
                   <button
                     key={p.key}
                     type="button"
                     onClick={() => setInput({ feePeriod: p.key })}
-                    className={`rounded-full px-2 leading-none transition-colors ${
+                    className={`rounded-full px-1.5 leading-none transition-colors ${
                       inputs.feePeriod === p.key
                         ? 'bg-volt font-semibold text-ink'
                         : 'text-paper-mute hover:text-paper'

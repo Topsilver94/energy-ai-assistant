@@ -235,7 +235,7 @@ const log = (m) => {
   log('场景F-2 变压器口径取短板完成')
 
   // F-3：切按月口径，月均 16 万 → 年 192 万 ÷ 0.75 = 256万 kWh → 强度 128.0，转实测（预估卡消失）
-  await page.locator('button:has-text("按月")').click()
+  await page.locator('button:text-is("月")').click()
   await page.locator('input[placeholder^="留空按典型强度"]').fill('16')
   await page.locator('button:has-text("开始诊断")').click()
   await page.waitForTimeout(600)
