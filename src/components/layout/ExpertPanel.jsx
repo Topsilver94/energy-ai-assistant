@@ -265,13 +265,14 @@ export default function ExpertPanel({ open, onClose, scope = 'expert' }) {
                   {section.hint}
                 </p>
               )}
-              {/* 组级来源：组内众数来源仅此一条（覆盖 ≥2 字段才提升） */}
+              {/* 组级来源：组内众数来源仅此一条（覆盖 ≥2 字段才提升）。
+                  不加「来源：」前缀——来源句自带「演示假设值：」等定性词，重复前缀会叠出双重冒号 */}
               {dominant && (
                 <p
                   className="mb-1 mt-1 line-clamp-2 text-[11px] leading-snug text-paper-mute/80"
                   title={dominant}
                 >
-                  来源：{dominant}
+                  {dominant}
                 </p>
               )}
               <div>
