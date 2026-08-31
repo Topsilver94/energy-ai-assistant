@@ -190,7 +190,8 @@ export const buildRecommendations = (
   const coolingVerify = buildingType === '工业厂房'
 
   // ── 充电桩：类型客流代理推断，车位未知 → 置信度如实降级为待确认 ──
-  const pilesPer = config.charger.pilesPer10kSqm[buildingType] ?? 4
+  // 类型未知时按保守端取值（双枪桩台数口径，与配建表重折口径一致）
+  const pilesPer = config.charger.pilesPer10kSqm[buildingType] ?? 2
   const piles = Math.max(R.chargerMinPiles.values, Math.round((area / 1e4) * pilesPer))
   const chargerScore = clamp(Math.round((buildingType === '商场' ? 60 : 45) + (isNew ? 5 : 0)))
 
@@ -279,7 +280,7 @@ export const buildRecommendations = (
       suggestedScale: piles,
       confidence: 'verify',
       reasons: [
-        `按${buildingType}配建水平 ${pilesPer} 桩/万㎡，建议约 ${piles} 桩`,
+        `按${buildingType}配建水平 ${pilesPer} 桩（双枪一体）/万㎡，建议约 ${piles} 桩 ≈ 覆盖 ${piles * 2} 个充电车位`,
         '需确认车位数量与车流后定型（当前为类型代理推断）',
         ...(isNew ? ['新建可预留配电回路与管沟，后期加装成本最低'] : []),
       ],
