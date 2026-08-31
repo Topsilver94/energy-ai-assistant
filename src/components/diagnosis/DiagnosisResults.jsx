@@ -69,14 +69,23 @@ export default function DiagnosisResults({ recs, onApply }) {
   const typeLabel =
     benchmarkTypes.find((b) => b.key === diagnosis.buildingType)?.label ?? diagnosis.buildingType
 
-  // 对比条：以 max(采用强度, 基准) 归一化；虚线=约束值，绿=基准内，amber=超基准部分。
-  // 新建未填设计值时采用强度=约束值，条形无信息量，跳过
+  // 对比双条：基准/实际共底线对齐（端点位置差比单条内的色段宽度易读），
+  // 实际条基准内=亮绿、超基准尾段=amber、基准条=中性灰参照；行首行尾自带标签，无需图例。
+  // 差值行把超出量折算成电费（对标差距口径、按当期电价，非承诺节收益）——售前钩子。
+  // 新建未填设计值时采用强度=约束值，双条等长无信息量，跳过
   const showBar = !(isNew && !diagnosis.designChecked)
   const maxVal = Math.max(diagnosis.actualIntensity, diagnosis.benchmarkIntensity)
   const actualPct = (diagnosis.actualIntensity / maxVal) * 100
   const benchPct = (diagnosis.benchmarkIntensity / maxVal) * 100
   const overPct = Math.max(0, actualPct - benchPct)
   const barLabel = isNew ? '设计强度' : '实际用量'
+  const benchLabel = isNew ? '约束值' : '行业基准'
+  const isOver = diagnosis.actualIntensity > diagnosis.benchmarkIntensity
+  // 超出电量与折电费（分省电价来自 config 公开数据表；电价缺失时只给电量不折钱）
+  const elecPrice = config.provinces[diagnosis.province]?.elecPrice
+  const excessWanKwh = ((diagnosis.actualIntensity - diagnosis.benchmarkIntensity) * diagnosis.area) / 1e4
+  const excessWanYuan = Number.isFinite(elecPrice) ? excessWanKwh * elecPrice : null
+  const belowPct = ((diagnosis.benchmarkIntensity - diagnosis.actualIntensity) / diagnosis.benchmarkIntensity) * 100
 
   const summary = isNew
     ? [
@@ -124,42 +133,75 @@ export default function DiagnosisResults({ recs, onApply }) {
         </div>
       )}
 
-      {/* 基准对比条 */}
+      {/* 基准对比双条（行首标签 + 行尾数值，共底线；实际条 amber 尾段 = 超出量） */}
       {showBar && (
         <div>
-          <div className="relative h-6 overflow-hidden rounded bg-ink-raised">
-            <div
-              className="absolute inset-y-0 left-0 bg-volt"
-              style={{ width: `${actualPct - overPct}%` }}
-            />
-            {overPct > 0 && (
-              <div
-                className="absolute inset-y-0 bg-amber"
-                style={{ left: `${benchPct}%`, width: `${overPct}%` }}
-              />
-            )}
-            {/* 基准虚线标记 */}
-            <div
-              className="absolute inset-y-0 border-l-2 border-dashed border-paper/80"
-              style={{ left: `${benchPct}%` }}
-            />
-          </div>
-          <div className="mt-1.5 flex items-center gap-4 text-[11px] text-paper-mute">
-            <span className="flex items-center gap-1">
-              <span className="h-2 w-2 rounded-sm bg-volt" />
-              {barLabel}
-            </span>
-            {overPct > 0 && (
-              <span className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-sm bg-amber" />
-                超基准
-              </span>
-            )}
-            <span className="flex items-center gap-1">
-              <span className="h-3 w-0 border-l-2 border-dashed border-paper/80" />
-              {isNew ? '约束值' : '行业基准'}
+          <div className="flex items-center gap-2.5">
+            <span className="w-14 shrink-0" />
+            <span className="flex-1" />
+            <span className="w-24 shrink-0 text-right font-mono text-[10px] text-paper-mute">
+              kWh/㎡·a
             </span>
           </div>
+          <div className="space-y-1.5">
+            {[
+              { label: benchLabel, intensity: diagnosis.benchmarkIntensity, pct: benchPct, tone: 'ref' },
+              { label: barLabel, intensity: diagnosis.actualIntensity, pct: actualPct, tone: 'actual' },
+            ].map((row) => (
+              <div key={row.label} className="flex items-center gap-2.5">
+                <span className="w-14 shrink-0 text-[12px] text-paper-mute">{row.label}</span>
+                <div className="relative h-2.5 flex-1 overflow-hidden rounded bg-ink-raised">
+                  {row.tone === 'ref' ? (
+                    <div
+                      className="absolute inset-y-0 left-0 bg-paper-mute/50"
+                      style={{ width: `${row.pct}%` }}
+                    />
+                  ) : (
+                    <>
+                      <div
+                        className="absolute inset-y-0 left-0 bg-volt"
+                        style={{ width: `${row.pct - overPct}%` }}
+                      />
+                      {overPct > 0 && (
+                        <div
+                          className="absolute inset-y-0 bg-amber"
+                          style={{ left: `${row.pct - overPct}%`, width: `${overPct}%` }}
+                        />
+                      )}
+                    </>
+                  )}
+                </div>
+                <span className="tabular w-24 shrink-0 text-right font-mono text-[12px] text-paper">
+                  {row.intensity.toFixed(1)}
+                </span>
+              </div>
+            ))}
+          </div>
+          {/* 差值行：把超出量折成钱（低于基准时改口优于均值，不硬造收益） */}
+          {!isNew && (
+            <p className="mt-2 text-[12px] leading-relaxed text-paper-mute">
+              {isOver ? (
+                <>
+                  超出基准{' '}
+                  <span className="tabular font-mono text-amber">
+                    {diagnosis.savingPotential.toFixed(1)}%
+                  </span>{' '}
+                  ≈ {excessWanKwh.toFixed(1)} 万kWh/年
+                  {excessWanYuan !== null && (
+                    <>
+                      {' '}· 按当地电价 {elecPrice} 元折电费约{' '}
+                      <span className="tabular font-mono text-amber">
+                        {excessWanYuan >= 10 ? excessWanYuan.toFixed(0) : excessWanYuan.toFixed(1)} 万元
+                      </span>
+                      /年
+                    </>
+                  )}
+                </>
+              ) : (
+                <>低于基准 {belowPct.toFixed(1)}% · 能效优于行业均值</>
+              )}
+            </p>
+          )}
         </div>
       )}
 

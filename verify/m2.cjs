@@ -73,6 +73,18 @@ const log = (m) => {
     }
   })
 
+  // 基准对比双条差值行（超出量折电费为售前钩子：20000㎡·超33.3→66.7万kWh·×0.75=50万）
+  report.extracted.potentialBar = await page.evaluate(() => {
+    const body = document.body.textContent.replace(/\s+/g, ' ')
+    return {
+      hasExcessPct: body.includes('超出基准 25.0%'),
+      hasExcessKwh: body.includes('66.7 万kWh/年'),
+      hasMoney: body.includes('折电费约 50 万元'),
+      hasBenchRow: body.includes('行业基准'),
+      hasActualRow: body.includes('实际用量'),
+    }
+  })
+
   // 热力图：抓取含「匹配度」表头后的网格文本
   report.extracted.heatmap = await page.evaluate(() => {
     const all = [...document.querySelectorAll('table, .grid')]
