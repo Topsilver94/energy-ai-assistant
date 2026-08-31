@@ -196,6 +196,23 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
         </div>
       )}
 
+      {/* 车位数量（选填，两种性质共用）：实填后充电桩规模从「类型代理推断」升级为
+          「政策配建实证」（配建比例见规则表 chargerPolicyRatio），推荐置信度随之升级 */}
+      <label className="block">
+        <span className="mb-1.5 flex items-baseline justify-between text-[13px] text-paper-mute">
+          车位数量 <span className="font-mono text-[12px]">选填·个</span>
+        </span>
+        <input
+          type="number"
+          min="0"
+          step="1"
+          placeholder="留空按类型配建水平推定"
+          value={inputs.parkingSpots}
+          onChange={(e) => setInput({ parkingSpots: e.target.value })}
+          className={`${inputClass} font-mono`}
+        />
+      </label>
+
       {isNew ? (
         <p className="text-[12px] leading-relaxed text-paper-mute">
           新建建筑无实际电费：填写设计强度输出

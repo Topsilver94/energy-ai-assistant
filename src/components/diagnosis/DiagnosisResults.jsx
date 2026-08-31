@@ -42,6 +42,7 @@ export default function DiagnosisResults({ recs, onApply }) {
         province: inputs.province,
         roofType: inputs.roofType,
         transformerKva: inputs.transformerKva,
+        parkingSpots: inputs.parkingSpots,
       })
     }
   }, [config, isDiagnosisDone])

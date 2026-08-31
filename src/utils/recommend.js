@@ -91,6 +91,7 @@ export const buildRecommendations = (
     year: rawYear,
     annualConsumption: rawAnnualConsumption,
     transformerKva: rawTransformerKva,
+    parkingSpots: rawParkingSpots,
   },
   config,
 ) => {
@@ -189,10 +190,28 @@ export const buildRecommendations = (
   // 工业厂房冷负荷以工艺发热为主，面积指标先天粗糙 → 置信度如实降级，待工艺资料复核
   const coolingVerify = buildingType === '工业厂房'
 
-  // ── 充电桩：类型客流代理推断，车位未知 → 置信度如实降级为待确认 ──
+  // ── 充电桩：车位实填 → 政策配建实证（置信度 high）；留空 → 类型代理推断（如实降级 verify）。
+  //    换算链与配建表同源：充电车位 = 车位数 × 政策配建比例（1 车位 1 枪）→ ÷2 枪 = 双枪整机桩数 ──
+  const GUNS_PER_PILE = 2 // 桩＝120kW 双枪一体整机，与 capexPerPile/dailyKwhPerPile 口径同源
+  const filledSpots = Number(rawParkingSpots)
+  const hasParking = Number.isFinite(filledSpots) && filledSpots > 0
   // 类型未知时按保守端取值（双枪桩台数口径，与配建表重折口径一致）
   const pilesPer = config.charger.pilesPer10kSqm[buildingType] ?? 2
-  const piles = Math.max(R.chargerMinPiles.values, Math.round((area / 1e4) * pilesPer))
+  const guns = hasParking ? Math.ceil(filledSpots * R.chargerPolicyRatio.values) : null
+  const piles = Math.max(
+    R.chargerMinPiles.values,
+    hasParking ? Math.ceil(guns / GUNS_PER_PILE) : Math.round((area / 1e4) * pilesPer),
+  )
+  const chargerReason = hasParking
+    ? `实填车位 ${filledSpots.toLocaleString()} 个 × 配建比例 ${Math.round(R.chargerPolicyRatio.values * 100)}%（政策底线，地方标准可上调）→ 充电车位约 ${guns} 个（1 车位 1 枪）→ 双枪整机建议约 ${piles} 桩 ≈ 覆盖 ${piles * GUNS_PER_PILE} 个充电车位`
+    : `按${buildingType}配建水平 ${pilesPer} 桩（双枪一体）/万㎡，建议约 ${piles} 桩 ≈ 覆盖 ${piles * GUNS_PER_PILE} 个充电车位`
+  const chargerReasons = [
+    chargerReason,
+    ...(hasParking
+      ? ['车位为实填数据，规模按政策配建比例实证推导；建议再按车流峰值校核枪数与功率档位']
+      : ['需确认车位数量与车流后定型（当前为类型代理推断）']),
+    ...(isNew ? ['新建可预留配电回路与管沟，后期加装成本最低'] : []),
+  ]
   const chargerScore = clamp(Math.round((buildingType === '商场' ? 60 : 45) + (isNew ? 5 : 0)))
 
   return [
@@ -278,12 +297,8 @@ export const buildRecommendations = (
       score: chargerScore,
       level: levelOf(chargerScore),
       suggestedScale: piles,
-      confidence: 'verify',
-      reasons: [
-        `按${buildingType}配建水平 ${pilesPer} 桩（双枪一体）/万㎡，建议约 ${piles} 桩 ≈ 覆盖 ${piles * 2} 个充电车位`,
-        '需确认车位数量与车流后定型（当前为类型代理推断）',
-        ...(isNew ? ['新建可预留配电回路与管沟，后期加装成本最低'] : []),
-      ],
+      confidence: hasParking ? 'high' : 'verify',
+      reasons: chargerReasons,
       estimate: estimateOf('charger', piles, province, config),
     },
   ].sort((a, b) => b.score - a.score)

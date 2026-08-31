@@ -11,6 +11,8 @@
 // 场景F 电费未知兜底：F1 留空 → 面积口径 115×20000=230万kWh → 潜力 13.0%（预估标注）
 //   F2 变压器实填 1100kVA → 变压器口径 216.8万 < 面积口径 230万 → 取短板，强度 108.4
 //   F3 月均电费 16万 → 年 192万 ÷ 0.75 = 256万kWh → 强度 128.0，转实测口径（预估卡消失）
+// 场景G 车位实填实证：办公 20000㎡·电费200万·车位120 → 120×10%配建=12充电车位 → 双枪整机 6 桩
+//   预期：推理行走实证口径（实填车位 120 个 × 配建比例 10%），置信度 verify→high，代理推断文案消失
 const { chromium } = require('playwright')
 const fs = require('fs')
 const path = require('path')
@@ -82,6 +84,15 @@ const log = (m) => {
       hasMoney: body.includes('折电费约 50 万元'),
       hasBenchRow: body.includes('行业基准'),
       hasActualRow: body.includes('实际用量'),
+    }
+  })
+
+  // 充电桩默认口径（车位留空 → 类型代理推断，置信度 verify 档）
+  report.extracted.chargerProxy = await page.evaluate(() => {
+    const body = document.body.textContent.replace(/\s+/g, ' ')
+    return {
+      has4Piles: body.includes('建议约 4 桩 ≈ 覆盖 8 个充电车位'),
+      hasProxyNote: body.includes('当前为类型代理推断'),
     }
   })
 
@@ -260,6 +271,24 @@ const log = (m) => {
   })
   await page.screenshot({ path: path.join(shotDir, 'm2-09-fee-monthly.png'), fullPage: true })
   log('场景F-3 月均电费转实测口径完成')
+
+  // ── 场景G：车位实填实证（120 位 × 10% 配建 → 12 充电车位 → 双枪整机 6 桩，置信度 verify→high）──
+  await page.locator('button:text-is("年")').click()
+  await page.locator('input[placeholder^="留空按典型强度"]').fill('200')
+  await page.locator('input[placeholder^="留空按类型配建水平推定"]').fill('120')
+  await page.locator('button:has-text("开始诊断")').click()
+  await page.waitForTimeout(600)
+  report.extracted.parkingEmpirical = await page.evaluate(() => {
+    const body = document.body.textContent.replace(/\s+/g, ' ')
+    return {
+      hasEmpiricalReason: body.includes('实填车位 120 个 × 配建比例 10%'),
+      has12Spots: body.includes('充电车位约 12 个'),
+      has6Piles: body.includes('双枪整机建议约 6 桩 ≈ 覆盖 12 个充电车位'),
+      noProxyNote: !body.includes('当前为类型代理推断'),
+    }
+  })
+  await page.screenshot({ path: path.join(shotDir, 'm2-10-parking.png'), fullPage: true })
+  log('场景G 车位实填（充电桩实证口径）完成')
 
   await browser.close()
   fs.writeFileSync(path.join(outDir, 'm2.json'), JSON.stringify(report, null, 2))

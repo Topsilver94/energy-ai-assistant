@@ -66,6 +66,11 @@ export default function DiagnosisModule({ wide = false, onApplied }) {
         return
       }
     }
+    const spots = Number(inputs.parkingSpots)
+    if (inputs.parkingSpots !== '' && !(Number.isFinite(spots) && spots > 0)) {
+      showToast('车位数量须为大于 0 的数字（留空则按类型配建水平推定）')
+      return
+    }
     setLoading(true)
     window.setTimeout(() => {
       const result = calculateDiagnosis(useDiagnosisStore.getState().inputs, config)
@@ -74,7 +79,8 @@ export default function DiagnosisModule({ wide = false, onApplied }) {
         setLoading(false)
         return
       }
-      // 快照附 area / province / roofType：推荐引擎与结果展示需要，避免表单后续编辑造成错位
+      // 快照附 area / province / roofType / transformerKva / parkingSpots：推荐引擎与结果展示
+      // 需要，避免表单后续编辑造成错位
       setDiagnosis({
         ...result,
         buildingType: inputs.buildingType,
@@ -83,6 +89,7 @@ export default function DiagnosisModule({ wide = false, onApplied }) {
         province: inputs.province,
         roofType: inputs.roofType,
         transformerKva: inputs.transformerKva,
+        parkingSpots: inputs.parkingSpots,
       })
       setLoading(false)
     }, MIN_LOADING_MS)
@@ -110,6 +117,7 @@ export default function DiagnosisModule({ wide = false, onApplied }) {
               year: diagnosis.year,
               annualConsumption: diagnosis.annualConsumption,
               transformerKva: diagnosis.transformerKva,
+              parkingSpots: diagnosis.parkingSpots,
             },
             config,
           )

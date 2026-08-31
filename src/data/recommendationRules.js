@@ -42,6 +42,10 @@ export const recommendationRules = {
     values: 2,
     source: '演示假设值：充电桩最小示范配置',
   },
+  chargerPolicyRatio: {
+    values: 0.1,
+    source: '国办发〔2015〕73 号政策底线：大型公共建筑物配建充电设施或预留充电车位比例不低于 10%（北京等地方标准已达 25%~40%，可按项目所在地标准上调）；车位实填时用于充电车位折算',
+  },
   levelBuckets: {
     values: { 推荐: 75, 可考虑: 50, 谨慎: 25 },
     source: '展示分桶（分类逻辑，非财务系数）：≥75 推荐 / ≥50 可考虑 / ≥25 谨慎 / 其余暂缓',
