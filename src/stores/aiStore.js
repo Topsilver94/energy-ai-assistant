@@ -11,7 +11,10 @@ export const useAiStore = create((set) => ({
   baseURL: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
   modelName: 'glm-5',
   isGenerating: false,
-  reportContent: '', // 已生成的方案 Markdown
+  reportContent: '', // 已生成的方案正文 Markdown（五段，报告外壳由 ReportDocument 版式渲染）
+  // 报告头徽章数据源：'ai'（GLM-5 流式）| 'local'（本地模板降级）| null（未生成）
+  generationSource: null,
+  logoDataUrl: '', // 公司 LOGO（内存态，同 apiKey 纪律：仅本次会话，刷新即清空，严禁持久化）
   error: null,
 
   setApiKey: (apiKey) => set({ apiKey }),
@@ -19,8 +22,10 @@ export const useAiStore = create((set) => ({
   setModelName: (modelName) => set({ modelName }),
   setGenerating: (isGenerating) => set({ isGenerating }),
   setReportContent: (reportContent) => set({ reportContent }),
+  setGenerationSource: (generationSource) => set({ generationSource }),
+  setLogo: (logoDataUrl) => set({ logoDataUrl }),
   // 流式追加（打字机渲染，Sprint 4）：逐 chunk 拼接，避免整包替换
   appendReport: (chunk) => set((s) => ({ reportContent: s.reportContent + chunk })),
   setError: (error) => set({ error }),
-  clearReport: () => set({ reportContent: '' }),
+  clearReport: () => set({ reportContent: '', generationSource: null }),
 }))

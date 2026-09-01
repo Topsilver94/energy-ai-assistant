@@ -15,6 +15,7 @@ import {
 import Card from '../ui/Card'
 import StatusBadge from '../ui/StatusBadge'
 import Button from '../ui/Button'
+import ReportDocument from './ReportDocument'
 import { useProjectStore } from '../../stores/projectStore'
 import { useDiagnosisStore } from '../../stores/diagnosisStore'
 import { useAiStore } from '../../stores/aiStore'
@@ -44,6 +45,7 @@ export default function AIReportPanel({ wide = false }) {
   const modelName = useAiStore((s) => s.modelName)
   const setGenerating = useAiStore((s) => s.setGenerating)
   const setReportContent = useAiStore((s) => s.setReportContent)
+  const setGenerationSource = useAiStore((s) => s.setGenerationSource)
   const appendReport = useAiStore((s) => s.appendReport)
   const setError = useAiStore((s) => s.setError)
   const clearReport = useAiStore((s) => s.clearReport)
@@ -83,9 +85,10 @@ export default function AIReportPanel({ wide = false }) {
     const project = { inputs: p.inputs, feasibility: p.feasibility }
     const diagnosis = { inputs: d.inputs, diagnosis: d.diagnosis }
 
-    // 降级路径：本地模板生成 + 明确提示原因
+    // 降级路径：本地模板生成 + 明确提示原因（报告头徽章标记来源）
     const fallback = (notice) => {
       setReportContent(buildReportDraft(project, diagnosis, config))
+      setGenerationSource('local')
       setError(notice)
       setGenerating(false)
     }
@@ -108,7 +111,10 @@ export default function AIReportPanel({ wide = false }) {
       system,
       user,
       onChunk: (delta) => appendReport(delta),
-      onComplete: () => setGenerating(false),
+      onComplete: () => {
+        setGenerating(false)
+        setGenerationSource('ai')
+      },
       onError: ({ type, message }) => {
         if (type === 'aborted') {
           // 用户主动停止：已有部分内容则保留，否则降级到本地模板
@@ -240,13 +246,20 @@ export default function AIReportPanel({ wide = false }) {
             </p>
           )}
 
+          {/* 报告版式容器：报告头/执行摘要/数据表/报告尾确定性渲染，AI 正文只进正文槽 */}
           <div
             ref={scrollRef}
-            className={`md mt-4 flex-1 overflow-y-auto print:max-h-none print:overflow-visible ${
+            className={`mt-4 flex-1 overflow-y-auto print:max-h-none print:overflow-visible ${
               wide ? 'max-h-[600px]' : 'max-h-[520px]'
             }`}
           >
-            <Markdown remarkPlugins={[remarkGfm]}>{reportContent}</Markdown>
+            <ReportDocument>
+              {reportContent ? (
+                <Markdown remarkPlugins={[remarkGfm]}>{reportContent}</Markdown>
+              ) : (
+                <p className="text-[13px] text-paper-mute">正文生成中…</p>
+              )}
+            </ReportDocument>
           </div>
         </>
       )}

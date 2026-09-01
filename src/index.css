@@ -29,7 +29,7 @@ body {
   @apply mb-3 text-xl font-bold;
 }
 .md h2 {
-  @apply mb-2 mt-5 text-base font-bold;
+  @apply mb-2.5 mt-6 border-b border-line pb-1.5 text-base font-bold;
 }
 .md p {
   @apply my-2;
@@ -70,15 +70,30 @@ body {
   .md ul,
   .md ol,
   .md td,
-  .md strong {
+  .md strong,
+  .report-doc,
+  .report-doc p,
+  .report-doc ul,
+  .report-doc li,
+  .report-doc span,
+  .report-doc label,
+  .report-doc td {
     color: #000000 !important;
   }
-  .md th {
+  .md th,
+  .report-doc th {
     background: transparent !important;
     color: #000000 !important;
   }
   .md blockquote {
     border-color: #999999 !important;
     color: #333333 !important;
+  }
+  .report-doc th,
+  .report-doc td {
+    border-color: #999999 !important;
+  }
+  .md h2 {
+    border-color: #999999 !important;
   }
 }

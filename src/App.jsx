@@ -70,6 +70,19 @@ export default function App() {
       {mode === 'work' && <WorkNav active={activeKey} onChange={setActiveKey} />}
       <StepNav />
       <ModeSwitch mode={mode} onChange={setMode} />
+      {/* 应用页脚：开源声明（仓库 LICENSE 同口径）+ 口径提示；报告自身的版权/免责在 ReportDocument 报告尾 */}
+      <footer className="no-print border-t border-line px-6 py-3 text-center text-[11px] text-paper-mute">
+        <a
+          href="https://github.com/Topsilver94/energy-ai-assistant"
+          target="_blank"
+          rel="noreferrer"
+          className="hover:text-paper"
+        >
+          MIT License · 源码仓库
+        </a>
+        <span className="mx-2 text-paper-faint">|</span>
+        <span>测算基于公开数据与演示系数，供决策参考</span>
+      </footer>
       {/* 两个配置抽屉一次只开一个；同一组件按 scope 渲染各自分组 */}
       <ExpertPanel scope="expert" open={drawer === 'expert'} onClose={() => setDrawer(null)} />
       <ExpertPanel scope="public" open={drawer === 'public'} onClose={() => setDrawer(null)} />
