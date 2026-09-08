@@ -18,7 +18,7 @@ import AIReportPanel from './components/aiReport/AIReportPanel'
  * （不进 store，props 仅 1 层）
  */
 export default function App() {
-  // 当前打开的配置抽屉：'expert'（专家参数）/ 'public'（公开平台数据参考）/ null
+  // 当前打开的配置抽屉：'expert'（专家参数）/ 'power'（电力市场数据）/ 'reference'（工程估算参考）/ null
   const [drawer, setDrawer] = useState(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [mode, setMode] = useState('work')
@@ -37,20 +37,21 @@ export default function App() {
   return (
     <div className="flex min-h-screen flex-col">
       <Header
-        onOpenPanel={() => setDrawer('expert')}
-        onOpenReference={() => setDrawer('public')}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenExpert={() => setDrawer('expert')}
+        onOpenPower={() => setDrawer('power')}
+        onOpenReference={() => setDrawer('reference')}
       />
 
       {mode === 'work' ? (
         /* 工作模式：横向满宽（max-w-6xl），模块内部表单/结果双栏并排，
            尽量一屏收纳不下滑；导航固定在屏幕左缘（WorkNav） */
-        <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-6">
+        <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-6 print:px-0 print:py-0">
           <section className="min-w-0">{activeModule.node}</section>
         </main>
       ) : (
         /* 演示模式：三列同屏全貌 */
-        <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
+        <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8 print:px-0 print:py-0">
           <section className="no-print mb-6">
             <h2 className="text-2xl font-bold">挖掘痛点 · 锁定收益 · 订制方案，三步闭环</h2>
             <p className="mt-1.5 text-sm leading-relaxed text-paper-mute">
@@ -59,7 +60,7 @@ export default function App() {
             </p>
           </section>
 
-          <div className="grid gap-6 lg:grid-cols-3">
+          <div className="grid gap-6 lg:grid-cols-3 print:block">
             <DiagnosisModule wide={false} />
             <CalculatorModule wide={false} />
             <AIReportPanel wide={false} />
@@ -83,9 +84,10 @@ export default function App() {
         <span className="mx-2 text-paper-faint">|</span>
         <span>测算基于公开数据与演示系数，供决策参考</span>
       </footer>
-      {/* 两个配置抽屉一次只开一个；同一组件按 scope 渲染各自分组 */}
+      {/* 三个配置抽屉一次只开一个；同一组件按 scope 渲染各自分组 */}
       <ExpertPanel scope="expert" open={drawer === 'expert'} onClose={() => setDrawer(null)} />
-      <ExpertPanel scope="public" open={drawer === 'public'} onClose={() => setDrawer(null)} />
+      <ExpertPanel scope="power" open={drawer === 'power'} onClose={() => setDrawer(null)} />
+      <ExpertPanel scope="reference" open={drawer === 'reference'} onClose={() => setDrawer(null)} />
       <ApiSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   )

@@ -55,13 +55,17 @@ const numericize = (obj, ref) => {
 }
 
 /**
- * 配置抽屉（CLAUDE.md §5 配置中心的入口），一个组件按 scope 服务两个独立抽屉：
- *   scope='expert' 专家参数抽屉——系统可调系数（光伏/储能/集中供冷/充电桩）
- *   scope='public' 公开平台数据参考抽屉——分省/通用/基准，低频校准、对外参考展示
- * 两个抽屉各自由页头入口打开（一次只开一个），内容分组由契约里的 scope 字段决定。
+ * 配置抽屉（CLAUDE.md §5 配置中心的入口），一个组件按 scope 服务三个独立抽屉：
+ *   scope='expert'    专家参数抽屉——系统可调系数与财务假设（光伏/储能/集中供冷/充电桩/通用财务）
+ *   scope='power'     电力市场数据抽屉——分省电价/峰谷价差/分时结构/利用小时 + 电网排放因子，
+ *                     动态公开数据、随月度/季度换版（AS_OF 常量）
+ *   scope='reference' 工程估算参考抽屉——按建筑类型查表的经验参考（屋面/供冷折算/配建/
+ *                     储能定容与需量/电耗预估/对标基准），方案阶段估算
+ * 三个抽屉各自由页头入口打开（一次只开一个），内容分组由契约里的 scope 字段决定。
  *
  * 交互模式：打开时把 store 配置拷为本地草稿 → 任意编辑（不即时生效）
- * → 「保存配置」一次性数值化并提交 store → 「恢复默认」仅重置草稿。
+ * → 「保存配置」一次性数值化并提交 store → 「恢复默认」仅重置本抽屉字段的草稿
+ * （其他抽屉的当前值不受影响；全局还原 = 逐抽屉分别恢复）。
  * 原子提交避免半份数据触发重算。
  */
 export default function ExpertPanel({ open, onClose, scope = 'expert' }) {
@@ -102,7 +106,15 @@ export default function ExpertPanel({ open, onClose, scope = 'expert' }) {
   }
 
   const handleReset = () => {
-    setDraft(buildDefaultConfig()) // 仅重置草稿，保存后才生效
+    // 分抽屉恢复默认：仅重置本抽屉字段的草稿值，其他抽屉的当前值不受影响——
+    // 心智模型「抽屉即编辑范围」；需要全局还原时逐抽屉分别恢复（保存后生效，同交互模式）
+    const defaults = buildDefaultConfig()
+    setDraft((d) =>
+      sections.reduce(
+        (acc, s) => s.fields.reduce((a, f) => setByPath(a, f.path, getByPath(defaults, f.path)), acc),
+        d,
+      ),
+    )
   }
 
   // ── 栏目索引：scrollspy + 点击定位 ──
@@ -164,17 +176,22 @@ export default function ExpertPanel({ open, onClose, scope = 'expert' }) {
     ? groupFieldsByInitial(sections[activeIdx].fields)
     : null
 
-  // 抽屉身份：expert 可调系数；public 公开参考（低频校准，同样走保存生效）
-  const meta =
-    scope === 'public'
-      ? {
-          title: '公开平台数据参考',
-          subtitle: `${fieldCount} 项公开参考数据 · 低频校准 · 保存后全局即时生效 · 灰字为数据来源`,
-        }
-      : {
-          title: '专家参数',
-          subtitle: `${fieldCount} 项可调系数 · 保存后全局即时生效 · 灰字为数据来源`,
-        }
+  // 抽屉身份（scope → 标题与副题；未知 scope 兜底 expert，同 prop 默认值）
+  const drawerMeta = {
+    expert: {
+      title: '专家参数',
+      subtitle: `${fieldCount} 项可调系数 · 保存后全局即时生效 · 灰字为数据来源`,
+    },
+    power: {
+      title: '电力市场数据',
+      subtitle: `${fieldCount} 项公开数据 · 按月/季/年分层更新（见各分组说明）· 保存后全局即时生效`,
+    },
+    reference: {
+      title: '工程估算参考',
+      subtitle: `${fieldCount} 项查表参考 · 方案阶段估算 · 保存后全局即时生效 · 灰字为数据来源`,
+    },
+  }
+  const meta = drawerMeta[scope] ?? drawerMeta.expert
 
   return (
     <>
