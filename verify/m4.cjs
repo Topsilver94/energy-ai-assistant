@@ -1,14 +1,21 @@
 // 全链路验证脚本 · 模块③ 真实 GLM-5 流式生成
-// Key 经 GLM_KEY 环境变量注入（红线：不写入脚本/文件/localStorage，仅页面内存）
+// Key 读取：优先本地 verify/aikey.txt（gitignored，推荐），回退 GLM_KEY 环境变量
+// 红线：Key 仅注入页面内存，不写入脚本字面量/仓库/localStorage
 // 验证：测试连接成功 → 生成中打字机（内容分段增长）→ 五段结构 → 数字保真（AI 不改数）→ 分期/敏感性结论保留
 const { chromium } = require('playwright')
 const fs = require('fs')
 const path = require('path')
 
 const BASE = process.env.BASE_URL || 'http://localhost:5175'
-const GLM_KEY = process.env.GLM_KEY
+
+// Key 读取：优先本地 verify/aikey.txt（已 gitignore），回退 GLM_KEY 环境变量
+const keyFile = path.join(__dirname, 'aikey.txt')
+const GLM_KEY =
+  (fs.existsSync(keyFile) && fs.readFileSync(keyFile, 'utf8').trim()) ||
+  process.env.GLM_KEY ||
+  ''
 if (!GLM_KEY) {
-  console.error('缺少 GLM_KEY 环境变量')
+  console.error('缺少 API Key：请把 Key 粘贴到 verify/aikey.txt 首行（该文件已 gitignore），或设置环境变量 GLM_KEY')
   process.exit(1)
 }
 
@@ -39,7 +46,7 @@ const log = (m) => {
   await page.locator('text=组合投资').first().waitFor({ timeout: 5000 })
   await page.locator('nav[aria-label="模块导航"] button:has-text("挖掘痛点")').click()
   await page.locator('input[placeholder="如 10000"]').fill('20000')
-  await page.locator('input[placeholder="如 80"]').fill('200')
+  await page.locator('input[placeholder^="留空按典型强度"]').fill('200')
   await page.locator('button:has-text("开始诊断")').click()
   await page.locator('text=节能潜力').first().waitFor({ timeout: 5000 })
   log('准备完成：①② 已测算')
@@ -62,10 +69,12 @@ const log = (m) => {
   await page.locator('button:has-text("生成方案报告")').click()
 
   // 打字机验证：连续采样内容长度，应呈多次增长（而非一次性出现）
+  // 正文槽 .md 生成中为空占位「正文生成中…」（6 字）；GLM-5 推理模式可能先 thinking 后出正文，
+  // 故采样窗口放宽到 200s，完成判定 = 生成中指示消失且正文离开占位
   const lens = []
   const t0 = Date.now()
   const genStart = await page.locator('text=生成中').first().isVisible().catch(() => false)
-  for (let i = 0; i < 60; i += 1) {
+  for (let i = 0; i < 200; i += 1) {
     await page.waitForTimeout(1000)
     const len = await page.evaluate(() => {
       const el = document.querySelector('.md')
@@ -73,8 +82,8 @@ const log = (m) => {
     })
     lens.push(len)
     const stillGenerating = await page.locator('text=生成中').first().isVisible().catch(() => false)
-    if (len > 0 && !stillGenerating) break
-    if (Date.now() - t0 > 90000) break
+    if (!stillGenerating && len > 6) break
+    if (Date.now() - t0 > 210000) break
   }
   report.extracted.genStartIndicator = genStart
   report.extracted.contentLengths = lens
@@ -82,7 +91,7 @@ const log = (m) => {
   log(`流式生成耗时约 ${report.extracted.elapsedSec}s，内容长度轨迹 ${lens.length} 次采样`)
 
   // ── 3. 结果断言 ──
-  await page.waitForTimeout(500)
+  await page.waitForTimeout(1500)
   report.extracted.finalText = await page.locator('.md').textContent()
   report.extracted.errorAlert = await page.locator('[role="alert"]').textContent().catch(() => null)
   await page.screenshot({ path: path.join(shotDir, 'm4-01-glm-stream.png'), fullPage: true })
@@ -93,9 +102,9 @@ const log = (m) => {
     fiveSections: ['项目概述', '财务分析', '技术路径', '建设节奏', '预期收益'].every((s) => rt.includes(s)),
     numbersKept: {
       invest820: rt.includes('820'),
-      irr263: rt.includes('26.3'),
-      payback36: rt.includes('3.6'),
-      carbon1405: rt.includes('1405.9') || rt.includes('1405'),
+      irr222: rt.includes('22.2'),
+      payback43: rt.includes('4.3'),
+      carbon1239: rt.includes('1239.2') || rt.includes('1239'),
     },
     phasingKept: rt.includes('一期') || rt.includes('一次性建成'),
     sensitivityKept: rt.includes('最敏感变量') || rt.includes('敏感'),
@@ -108,6 +117,15 @@ const log = (m) => {
   const errs = report.consoleErrors.length + report.pageErrors.length
   console.log(`console错误 ${report.consoleErrors.length} · page错误 ${report.pageErrors.length}`)
   if (errs > 0) console.log(report.consoleErrors, report.pageErrors)
+  const failedChecks = Object.entries(report.extracted.checks).filter(([, v]) => v === false)
+  if (failedChecks.length || errs > 0) {
+    console.error(
+      '断言未通过：' +
+        (failedChecks.length ? failedChecks.map(([k]) => k).join(', ') : '（checks 全过）') +
+        ` · console/page 错误 ${errs}`
+    )
+    process.exit(1)
+  }
 })().catch((e) => {
   console.error('SCRIPT FAILED:', e)
   process.exit(1)
