@@ -32,13 +32,17 @@ export default function FeasibilityResults() {
   }, [config, isFeasibleDone])
 
   // 敏感性分析：从已展示的 feasibility 快照重建测算入参（与分项表严格同源——
-  // 测算后继续编辑表单不影响已出结果，config 变化随 feasibility 重算联动）
+  // 测算后继续编辑表单不影响已出结果，config 变化随 feasibility 重算联动；
+  // demand 回显随快照携带，储能需量收益在各扰动档位中同口径参与重算）
   const sensitivity = useMemo(() => {
     if (!feasibility) return null
     const systems = Object.fromEntries(
       feasibility.items.map((it) => [it.type, { enabled: true, capacity: it.capacity }]),
     )
-    return buildSensitivity({ systems, province: feasibility.province }, config)
+    return buildSensitivity(
+      { systems, province: feasibility.province, demand: feasibility.demand ?? null },
+      config,
+    )
   }, [feasibility, config])
 
   if (!feasibility) {

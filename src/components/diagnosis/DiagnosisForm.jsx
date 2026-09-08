@@ -18,6 +18,7 @@ const inputClass =
 /**
  * 模块① 输入表单：建筑性质（既有/新建）+ 面积 / 类型 / 省份
  * 既有另填：建造年份（滑杆）+ 年度电费；新建另填：设计能耗强度（可选，留空按约束值预估）
+ * 两种性质共用选填：屋面面积（图纸投影，实填后光伏规模走单项折减链）/ 车位数量
  * 省份用于读取分省电价（与模块②同一 config 数据源）
  */
 export default function DiagnosisForm({ onSubmit, loading = false }) {
@@ -29,6 +30,40 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
   const roofOptions = Object.keys(config.roof.types)
   const isNew = inputs.buildingNature === 'new'
   const benchmark = config.benchmarks[inputs.buildingType] ?? '—'
+
+  // 屋面面积 / 车位数量：两种性质共用的选填字段（行内组合随性质分流，字段本体不变）
+  const roofAreaField = (
+    <label className="block">
+      <span className="mb-1.5 flex items-baseline justify-between text-[13px] text-paper-mute">
+        屋面面积 <span className="font-mono text-[12px]">选填·㎡</span>
+      </span>
+      <input
+        type="number"
+        min="0"
+        step="any"
+        placeholder="留空按类型系数估算"
+        value={inputs.roofArea}
+        onChange={(e) => setInput({ roofArea: e.target.value })}
+        className={`${inputClass} font-mono`}
+      />
+    </label>
+  )
+  const parkingField = (
+    <label className="block">
+      <span className="mb-1.5 flex items-baseline justify-between text-[13px] text-paper-mute">
+        车位数量 <span className="font-mono text-[12px]">选填·个</span>
+      </span>
+      <input
+        type="number"
+        min="0"
+        step="1"
+        placeholder="留空按类型配建水平推定"
+        value={inputs.parkingSpots}
+        onChange={(e) => setInput({ parkingSpots: e.target.value })}
+        className={`${inputClass} font-mono`}
+      />
+    </label>
+  )
 
   return (
     <form
@@ -161,57 +196,53 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
         )}
       </div>
 
-      {/* 屋面类型 / 变压器容量（仅既有）：屋面业主一眼可知；变压器容量在供电合同上，
-          初次接触未必拿得到——留空按分类型配变指标推定（见公开抽屉·储能定容参考） */}
-      {!isNew && (
+      {/* 选填尾部按子系统分组：屋面组（面积实填优先 → 光伏规模，类型定密度与形式折减）同行
+          连贯录入；变压器容量（储能定容）与车位数量（充电桩配建）殿后。
+          新建无屋面类型（设计未定按 BIPV 满铺口径）、不采变压器（储能按光储配比兜底），
+          屋面面积与车位同行为选填尾部 */}
+      {isNew ? (
         <div className="grid grid-cols-2 gap-3">
-          <label className="block">
-            <span className="mb-1.5 block text-[13px] text-paper-mute">屋面类型</span>
-            <select
-              value={inputs.roofType || TYPICAL_ROOF[inputs.buildingType] || '平屋面'}
-              onChange={(e) => setInput({ roofType: e.target.value })}
-              className={inputClass}
-            >
-              {roofOptions.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className="mb-1.5 flex items-baseline justify-between text-[13px] text-paper-mute">
-              变压器容量 <span className="font-mono text-[12px]">选填·kVA</span>
-            </span>
-            <input
-              type="number"
-              min="0"
-              step="any"
-              placeholder="留空按类型指标推定"
-              value={inputs.transformerKva}
-              onChange={(e) => setInput({ transformerKva: e.target.value })}
-              className={`${inputClass} font-mono`}
-            />
-          </label>
+          {roofAreaField}
+          {parkingField}
         </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            {roofAreaField}
+            <label className="block">
+              <span className="mb-1.5 block text-[13px] text-paper-mute">屋面类型</span>
+              <select
+                value={inputs.roofType || TYPICAL_ROOF[inputs.buildingType] || '平屋面'}
+                onChange={(e) => setInput({ roofType: e.target.value })}
+                className={inputClass}
+              >
+                {roofOptions.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="mb-1.5 flex items-baseline justify-between text-[13px] text-paper-mute">
+                变压器容量 <span className="font-mono text-[12px]">选填·kVA</span>
+              </span>
+              <input
+                type="number"
+                min="0"
+                step="any"
+                placeholder="留空按类型指标推定"
+                value={inputs.transformerKva}
+                onChange={(e) => setInput({ transformerKva: e.target.value })}
+                className={`${inputClass} font-mono`}
+              />
+            </label>
+            {parkingField}
+          </div>
+        </>
       )}
-
-      {/* 车位数量（选填，两种性质共用）：实填后充电桩规模从「类型代理推断」升级为
-          「政策配建实证」（配建比例见规则表 chargerPolicyRatio），推荐置信度随之升级 */}
-      <label className="block">
-        <span className="mb-1.5 flex items-baseline justify-between text-[13px] text-paper-mute">
-          车位数量 <span className="font-mono text-[12px]">选填·个</span>
-        </span>
-        <input
-          type="number"
-          min="0"
-          step="1"
-          placeholder="留空按类型配建水平推定"
-          value={inputs.parkingSpots}
-          onChange={(e) => setInput({ parkingSpots: e.target.value })}
-          className={`${inputClass} font-mono`}
-        />
-      </label>
 
       {isNew ? (
         <p className="text-[12px] leading-relaxed text-paper-mute">

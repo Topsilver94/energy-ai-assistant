@@ -19,6 +19,9 @@ export const PROJECT_TYPES = [
 export const useProjectStore = create((set) => ({
   inputs: {
     province: '广东',
+    // 模块① 采纳推荐时随快照带入的需量推定（{ baseKw, kva, annualKwh }）：模块② 储能需量
+    // 收益与报告注记用；null/缺省 = 无诊断数据（② 独立测算路径，储能不计需量收益并如实注明）
+    demand: null,
     systems: {
       pv: { enabled: true, capacity: '' }, // 默认选中光伏，首屏即可测算
       storage: { enabled: false, capacity: '' },
@@ -50,11 +53,13 @@ export const useProjectStore = create((set) => ({
     })),
   setFeasibility: (result) => set({ feasibility: result, isFeasibleDone: true }),
   // 一键采纳模块① 推荐组合：仅启用 level 为「推荐/可考虑」的系统并填入建议规模，
-  // 谨慎/暂缓项关闭；未采纳项保留原规模。覆盖语义——UI 侧已做两段式确认
+  // 谨慎/暂缓项关闭；未采纳项保留原规模。覆盖语义——UI 侧已做两段式确认。
+  // 需量推定快照随储能推荐一并带入（无储能推荐时置 null，② 不计需量收益）
   applyRecommendation: (recs) =>
     set((s) => ({
       inputs: {
         ...s.inputs,
+        demand: recs.find((r) => r.key === 'storage')?.demand ?? null,
         systems: Object.fromEntries(
           Object.keys(s.inputs.systems).map((key) => {
             const rec = recs.find((r) => r.key === key)

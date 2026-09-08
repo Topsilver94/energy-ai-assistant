@@ -73,9 +73,9 @@ const AXES = [
 ]
 
 /** 单档重算：形状异常按该档无解（null）处理，不让整表崩溃 */
-const solve = (systems, province, config) => {
+const solve = (systems, province, demand, config) => {
   try {
-    const r = calculateFeasibility({ systems, province }, config)
+    const r = calculateFeasibility({ systems, province, demand }, config)
     if (!r) return null
     return { irr: r.total.irr, paybackPeriod: r.total.paybackPeriod }
   } catch {
@@ -90,13 +90,14 @@ const sigOf = (p) =>
     : `${p.irr.toFixed(6)}|${p.paybackPeriod.toFixed(6)}`
 
 /**
- * @param {{ systems: Object, province: string }} params 与 calculateFeasibility 同形
+ * @param {{ systems: Object, province: string, demand?: object|null }} params 与 calculateFeasibility 同形
+ *   （demand 为模块① 需量推定快照——储能需量收益在各扰动档位中同口径参与重算）
  * @param {object} config configStore 纯数值配置
  * @returns {{ applicable: boolean, base: {irr, paybackPeriod}, rows: Array, flat: Array,
  *            hurdle: number, summaryLines: string[] } | null} 无可测算项时返回 null
  */
-export const buildSensitivity = ({ systems, province }, config) => {
-  const base = solve(systems, province, config)
+export const buildSensitivity = ({ systems, province, demand }, config) => {
+  const base = solve(systems, province, demand, config)
   if (!base) return null
 
   // 组合年净现金流非正（回收期 N/A）时 IRR 恒报 0 口径失真，敏感性不适用
@@ -116,7 +117,7 @@ export const buildSensitivity = ({ systems, province }, config) => {
   for (const axis of AXES) {
     const points = FACTORS.map((factor) => ({
       factor,
-      ...solve(systems, province, axis.perturb(config, province, factor)),
+      ...solve(systems, province, demand, axis.perturb(config, province, factor)),
     }))
     // 平坦轴：所有档位与基准同签名 → 对本组合无影响
     if (points.every((p) => sigOf(p) === sigOf(base))) {

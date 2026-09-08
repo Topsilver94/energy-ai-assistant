@@ -71,6 +71,11 @@ export default function DiagnosisModule({ wide = false, onApplied }) {
       showToast('车位数量须为大于 0 的数字（留空则按类型配建水平推定）')
       return
     }
+    const roof = Number(inputs.roofArea)
+    if (inputs.roofArea !== '' && !(Number.isFinite(roof) && roof > 0)) {
+      showToast('屋面面积须为大于 0 的数字（留空则按类型系数推定）')
+      return
+    }
     setLoading(true)
     window.setTimeout(() => {
       const result = calculateDiagnosis(useDiagnosisStore.getState().inputs, config)
@@ -79,7 +84,7 @@ export default function DiagnosisModule({ wide = false, onApplied }) {
         setLoading(false)
         return
       }
-      // 快照附 area / province / roofType / transformerKva / parkingSpots：推荐引擎与结果展示
+      // 快照附 area / province / roofType / roofArea / transformerKva / parkingSpots：推荐引擎与结果展示
       // 需要，避免表单后续编辑造成错位
       setDiagnosis({
         ...result,
@@ -88,6 +93,7 @@ export default function DiagnosisModule({ wide = false, onApplied }) {
         area: Number(inputs.area),
         province: inputs.province,
         roofType: inputs.roofType,
+        roofArea: inputs.roofArea,
         transformerKva: inputs.transformerKva,
         parkingSpots: inputs.parkingSpots,
       })
@@ -114,6 +120,7 @@ export default function DiagnosisModule({ wide = false, onApplied }) {
               area: diagnosis.area,
               province: diagnosis.province,
               roofType: diagnosis.roofType,
+              roofArea: diagnosis.roofArea,
               year: diagnosis.year,
               annualConsumption: diagnosis.annualConsumption,
               transformerKva: diagnosis.transformerKva,
