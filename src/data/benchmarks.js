@@ -47,9 +47,9 @@ export const defaultBenchmarks = Object.fromEntries(
 )
 
 // 专家参数面板的建筑基准分组（与 coefficients.js 的 coefficientSections 同构）
-// scope: public —— 归入「公开平台数据参考」页签
+// scope: reference —— 归入「工程估算参考」抽屉（按建筑类型查表的方案阶段估算）
 export const benchmarkSection = {
-  scope: 'public',
+  scope: 'reference',
   title: '建筑能耗基准',
   hint: '单位 kWh/(㎡·a)，模块① 对标用',
   fields: benchmarkTypes.map((t) => ({

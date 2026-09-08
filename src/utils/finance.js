@@ -12,6 +12,13 @@
  *     共同计算期取各系统寿命最大值，各系统现金流寿命到期后归零（不做再投资假设）
  */
 
+// 需量计费政策门槛（全国统一规则，发改价格〔2026〕1077 号第四监管周期体系，2026-08 起）：
+// 变压器 ≥315 kVA 强制两部制，100–315 kVA 可选档保守不计需量收益
+const TWO_PART_KVA = 315
+// 需量电价激励机制：月每 kVA 用电量 ≥260 kWh 时当月需量电价按核定标准 90% 执行
+const DEMAND_INCENTIVE_KWH_PER_KVA = 260
+const DEMAND_INCENTIVE_DISCOUNT = 0.9
+
 /** NPV：t0 计 -investment，t1..T 逐年现金流取 flows[t-1] */
 const npvOf = (investment, flows, rate) => {
   let total = -investment
@@ -47,8 +54,9 @@ const calcIrr = (investment, flows) => {
  * 统一产出：capex / gross（投资与年毛收益，万元）/ energyKwh（碳减排口径电量，kWh）
  * + 对应系数组的运维比例与计算期，可选 fixedOm（固定年成本，万元，如场地租金）。
  * gross 已是「扣直接能源成本后」的毛收益。
+ * demand（可选）：模块① 推定的需量上下文 { baseKw, kva, annualKwh }，仅储能消费。
  */
-const perType = (projectType, scale, province, config) => {
+const perType = (projectType, scale, province, config, demand) => {
   const prov = config.provinces[province] ?? Object.values(config.provinces)[0]
   const price = prov.elecPrice // 元/kWh
 
@@ -73,18 +81,48 @@ const perType = (projectType, scale, province, config) => {
     const capex = (scale * storage.capexPerKWh) / 1e4
     // 年放电量按分省分时结构折算（循环判定读公开数据项 cyclesPerDay）：
     // 一充一放 = 谷充峰放 1 次全额价差循环；两充两放省另加第二循环（平充峰放），
-    // 其有效价差约为全额峰谷价差一半，按等效循环 cycle2SpreadRatio 折算计入
+    // 其有效价差约为全额峰谷价差一半，按等效循环 cycle2SpreadRatio 折算计入。
+    // 工程修正（2026-09）：可放电量 = 容量 × DoD × 年可用天数 × 等效循环——
+    // 原「容量 × 365 满充满放」口径未计放电深度与可用率，系统性高估约 20%
     const cyclesPerDay = prov.cyclesPerDay ?? 1
     const effectiveCycles = 1 + (cyclesPerDay >= 2 ? (storage.cycle2SpreadRatio ?? 0) : 0)
-    // 年放电量 = 容量(kWh) × 等效每日循环 × 365；套利收益 = 放电量 × 分省峰谷价差（元/kWh，公开数据项）
-    const dischargeKwh = scale * effectiveCycles * 365
+    const dischargeKwh =
+      scale * (storage.depthOfDischarge ?? 1) * (storage.availableDaysPerYear ?? 365) * effectiveCycles
+    // 充电损耗购电成本：综合效率 η 下每放 1 kWh 需充 1/η kWh，多充的 (1/η−1) 部分
+    // 按充电时段购电价计价（套利真利润 = 放电量 × 价差 − 损耗电量 × 充电电价）
+    const chargeLossKwh = dischargeKwh * (1 / (storage.roundTripEfficiency ?? 1) - 1)
+    const arbitrage =
+      (dischargeKwh * prov.peakValleySpread - chargeLossKwh * (storage.chargePricePerKwh ?? 0)) / 1e4
+
+    // 需量管理收益（可选）：模块① 需量推定快照带入时才计——两部制按需量计费用户的
+    // 削峰节省 = min(储能功率, 削峰系数 × 最大需量) × 需量电价 × 12。
+    // 计费前提按政策门槛判定（≥315 kVA 强制两部制；100–315 kVA 可选档保守不计）；
+    // 月每 kVA 用电 ≥260 kWh 时需量电价按 90% 执行（多省明文，确定性计入）。
+    // 与套利收益同用一次放电但属不同账单科目（电量费 vs 容量费），不构成电量重复计费
+    let demandSaving = 0
+    let demandDetail = null
+    if (demand && demand.baseKw > 0) {
+      if (demand.kva < TWO_PART_KVA) {
+        demandDetail = { baseKw: demand.baseKw, kva: demand.kva, skipped: '两部制门槛' }
+      } else {
+        const powerKw = scale / (config.storageSizing?.hours ?? 2)
+        const shavedKw = Math.min(powerKw, (storage.demandShaveRatio ?? 0) * demand.baseKw)
+        const monthlyPerKva = demand.annualKwh > 0 ? demand.annualKwh / 12 / demand.kva : 0
+        const price =
+          (storage.demandPricePerKwMonth ?? 0) *
+          (monthlyPerKva >= DEMAND_INCENTIVE_KWH_PER_KVA ? DEMAND_INCENTIVE_DISCOUNT : 1)
+        demandSaving = (shavedKw * price * 12) / 1e4
+        demandDetail = { baseKw: demand.baseKw, kva: demand.kva, shavedKw, monthlyPerKva, price, saving: demandSaving }
+      }
+    }
     return {
       capex,
-      gross: (dischargeKwh * prov.peakValleySpread) / 1e4,
+      gross: arbitrage + demandSaving,
       // 演示简化：碳减排按放电量计，忽略充放电时序电量结构
       energyKwh: dischargeKwh,
       omRatio: storage.omRatioPerYear,
       years: storage.lifetimeYears,
+      demandDetail,
     }
   }
 
@@ -133,14 +171,18 @@ const perType = (projectType, scale, province, config) => {
 
 /**
  * 可行性速算主入口（组合测算）
- * @param {{ systems: Object<string, {enabled: boolean, capacity: number|string}>, province: string }} params
+ * @param {{ systems: Object<string, {enabled: boolean, capacity: number|string}>, province: string,
+ *           demand?: { baseKw: number, kva: number, annualKwh: number } | null }} params
+ *   demand 为模块① 采纳推荐时随快照带入的需量推定（无诊断数据时缺省——储能不计需量收益，
+ *   报告侧如实注明，不静默硬造）；仅储能消费该参数
  * @param {object} config configStore 的纯数值配置
- * @returns {{ province, items: Array, total: object } | null}
- *   items：各选中系统的分项结果；total：组合总账（金额万元 / IRR 小数 /
- *   回收期年（净现金流≤0 时 'N/A'）/ 碳减排 tCO₂·a⁻¹）。无可测算项时返回 null。
+ * @returns {{ province, demand, items: Array, total: object } | null}
+ *   items：各选中系统的分项结果（储能含 demandDetail：已计入的削峰口径，或 skipped 原因）；
+ *   total：组合总账（金额万元 / IRR 小数 / 回收期年（净现金流≤0 时 'N/A'）/ 碳减排 tCO₂·a⁻¹）。
+ *   demand 原样回显——敏感性重建入参与分项表严格同源。无可测算项时返回 null。
  * @throws 入参形状不符时直接抛错（fail-fast，不做静默兜底）
  */
-export const calculateFeasibility = ({ systems, province }, config) => {
+export const calculateFeasibility = ({ systems, province, demand }, config) => {
   if (!systems || typeof systems !== 'object') {
     throw new Error('calculateFeasibility: 入参缺少 systems 对象')
   }
@@ -152,7 +194,7 @@ export const calculateFeasibility = ({ systems, province }, config) => {
 
   const items = entries.map(([type, sys]) => {
     const scale = Number(sys.capacity)
-    const typed = perType(type, scale, province, config)
+    const typed = perType(type, scale, province, config, demand)
     if (!typed) throw new Error(`calculateFeasibility: 未知系统类型「${type}」`)
 
     const om = typed.capex * typed.omRatio // 年运维（万元，按投资比例）
@@ -169,6 +211,7 @@ export const calculateFeasibility = ({ systems, province }, config) => {
       paybackPeriod: net > 0 ? typed.capex / net : 'N/A',
       carbonReduction: (typed.energyKwh / 1000) * config.general.gridEmissionFactor,
       years: typed.years,
+      ...(typed.demandDetail ? { demandDetail: typed.demandDetail } : {}),
     }
   })
 
@@ -186,6 +229,7 @@ export const calculateFeasibility = ({ systems, province }, config) => {
 
   return {
     province,
+    demand: demand ?? null, // 回显：敏感性/报告从快照重建入参时与分项表同源
     items,
     total: {
       totalInvestment,

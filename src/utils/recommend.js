@@ -34,7 +34,8 @@ export const coolingDesignKw = (coolingScaleWanSqm, buildingType, config) => {
 }
 
 /**
- * 储能布置红线（确定性提示，双出口：模块① 触发依据 + 模块③ prompt 注入）。
+ * 储能布置红线（确定性提示，仅模块③ 出口：AI prompt 注入 + 本地模板技术路径段，
+ * STEP1 投资推荐不展示——投资推荐简单清晰，方案文档兜底周全，2026-09 用户确认）。
  * 标准号与数字为现行国标口径：GB/T 51048-2025《电化学储能电站设计标准》
  * （2026-04 实施，取代 GB 51048-2014）、GB/T 42288-2022《安全规程》、GB 55037-2022《建筑防火通用规范》。
  */
@@ -46,6 +47,26 @@ const STEADY_LOAD_TYPES = ['医院', '酒店', '数据中心']
 // 区域供冷适用性弱的类型：高校以分体空调为主、工业厂房属工艺冷特例，达标也只给低档分
 const COOLING_WEAK_TYPES = ['高校', '工业厂房']
 
+/**
+ * 集中供冷客户侧全生命周期成本对比（确定性派生，双出口：模块① 冷却触发依据 + 模块③ 注入）。
+ * 客户视角签单钩子：自建分体空调（电费 + 维保 + 折旧，客户全担）vs 接入集中供冷（仅冷费，
+ * 无初投资——能源站由投资方建设）。分体参考系数均为演示假设值（面板可调），不构成报价承诺。
+ */
+export const coolingTcoNote = (province, config) => {
+  const c = config.cooling
+  const prov = config.provinces[province] ?? Object.values(config.provinces)[0]
+  const splitElec = (c.kwhPerSqm / c.copBaseline) * prov.elecPrice // 分体电费 = 冷量 ÷ 分散 COP × 电价
+  const splitOm = c.splitAcCapexPerSqm * c.splitAcOmRatioPerYear
+  const splitDep = c.splitAcCapexPerSqm / c.splitAcLifetimeYears
+  const splitTotal = splitElec + splitOm + splitDep
+  const district = c.kwhPerSqm * c.coolingPricePerKwh
+  if (!Number.isFinite(splitTotal) || !(splitTotal > 0)) return null
+  const save = splitTotal - district
+  return save > 0
+    ? `客户侧全生命周期对比：自建分体空调约 ${splitTotal.toFixed(1)} 元/㎡·a（电费 ${splitElec.toFixed(1)} + 维保 ${splitOm.toFixed(1)} + 折旧 ${splitDep.toFixed(1)}）vs 接入集中供冷约 ${district.toFixed(1)} 元/㎡·a —— 年省约 ${save.toFixed(1)} 元/㎡（${((save / splitTotal) * 100).toFixed(0)}%），且免整机 ${c.splitAcLifetimeYears} 年一换、免机房占用与维保责任`
+    : `客户侧全生命周期对比：接入集中供冷约 ${district.toFixed(1)} 元/㎡·a vs 自建分体空调约 ${splitTotal.toFixed(1)} 元/㎡·a —— 当前冷价口径下持平或略高，需以机房空间释放、运维免责与减碳价值论证`
+}
+
 const levelOf = (score) => {
   const b = R.levelBuckets.values
   if (score >= b['推荐']) return '推荐'
@@ -54,11 +75,12 @@ const levelOf = (score) => {
   return '暂缓'
 }
 
-/** 单系统财务预估：调自家计算器（try 兜形状异常，返回 null 时热力图显示 —） */
-const estimateOf = (key, scale, province, config) => {
+/** 单系统财务预估：调自家计算器（try 兜形状异常，返回 null 时热力图显示 —）；
+ *  demand（可选）仅储能消费——热力图储能列与模块② 采纳后口径一致 */
+const estimateOf = (key, scale, province, config, demand) => {
   try {
     const r = calculateFeasibility(
-      { systems: { [key]: { enabled: true, capacity: scale } }, province },
+      { systems: { [key]: { enabled: true, capacity: scale } }, province, ...(demand ? { demand } : {}) },
       config,
     )
     const it = r?.items?.[0]
@@ -79,7 +101,8 @@ const estimateOf = (key, scale, province, config) => {
  *            province: string, roofType?: string, year?: number|string }} params
  * @param {object} config configStore 纯数值配置
  * @returns {Array<{ key, label, scaleUnit, score, level, reasons: string[], suggestedScale,
- *            confidence: 'high'|'medium'|'verify', estimate: object|null }>} 按 score 降序
+ *            confidence: 'high'|'medium'|'verify', estimate: object|null,
+ *            demand?: { baseKw, kva, annualKwh } }>} 按 score 降序（demand 仅储能项携带：需量推定快照）
  */
 export const buildRecommendations = (
   {
@@ -88,6 +111,7 @@ export const buildRecommendations = (
     area: rawArea,
     province,
     roofType: rawRoof,
+    roofArea: rawRoofArea,
     year: rawYear,
     annualConsumption: rawAnnualConsumption,
     transformerKva: rawTransformerKva,
@@ -102,18 +126,32 @@ export const buildRecommendations = (
   // GB 55015 光伏强条：既有建成 ≥2022 年 → 光伏推荐附余量核对提示（新建按强条设计，不受此限）
   const pvHint = isNew ? null : pvMandatedHint(rawYear)
 
-  // ── 光伏：屋面条件推导——既有按屋面类型（平/坡/彩钢，未选按类型典型值），
+  // ── 光伏：屋面条件推导——屋面面积实填（图纸投影）优先，留空按面积 × 类型复合系数推定。
+  //    塔楼/综合体等形态极端项目类型系数失真大（投影占比可能仅 3–5%），实填直接走单项折减链；
+  //    既有另按屋面类型（平/坡/彩钢，未选按类型典型值）取密度与形式折减，
   //    新建不问屋面（设计未定）直接按 BIPV 一体化满铺口径；规模 kW（备案/并网通行） ──
   // 类型未知（不在基准表内）时按混合形态中位保守取值，与 usableRatio 重标口径一致
   const typeRatio = config.roof.usableRatio[buildingType] ?? 0.15
+  const filledRoofArea = Number(rawRoofArea)
+  const hasRoofArea = Number.isFinite(filledRoofArea) && filledRoofArea > 0
   let roofRatio
   let roofDensity
   let roofLabel
   let roofNote = null
+  let roofSourceNote // 触发依据首行：实填换算链 / 推定复合系数，两口径如实分述
+  let roofArea
   if (isNew) {
-    roofRatio = typeRatio * config.roof.bipv.ratioFactor
-    roofDensity = config.roof.bipv.kwPerSqm
+    const bipv = config.roof.bipv
+    roofRatio = typeRatio * bipv.ratioFactor
+    roofDensity = bipv.kwPerSqm
     roofLabel = 'BIPV 满铺'
+    // 实填：图纸屋面 × BIPV 覆盖率（已含设备口预留，不另乘障碍检修折减，防双重扣减）
+    roofArea = hasRoofArea
+      ? Math.round(filledRoofArea * bipv.ratioFactor)
+      : Math.round(area * roofRatio)
+    roofSourceNote = hasRoofArea
+      ? `实填屋面 ${Math.round(filledRoofArea).toLocaleString()} ㎡ × BIPV 覆盖率 ${bipv.ratioFactor} → 可安装约 ${roofArea.toLocaleString()} ㎡`
+      : `可用屋顶约 ${roofArea.toLocaleString()} ㎡（${buildingType}·${roofLabel}，可用系数 ${Math.round(roofRatio * 100) / 100}）`
   } else {
     const roofType = rawRoof || R.typicalRoof.values[buildingType] || '平屋面'
     const cfg = config.roof.types[roofType] ?? config.roof.types.平屋面
@@ -126,13 +164,18 @@ export const buildRecommendations = (
         : roofType === '彩钢屋面'
           ? '彩钢屋面夹具直贴、安装成本最低，需复核板型厚度与屋面荷载'
           : null
+    // 实填：图纸屋面 × 障碍检修折减 × 屋面形式折减（坡屋面朝向另乘）
+    roofArea = hasRoofArea
+      ? Math.round(filledRoofArea * config.roof.installRatio * cfg.ratioFactor)
+      : Math.round(area * roofRatio)
+    roofSourceNote = hasRoofArea
+      ? `实填屋面 ${Math.round(filledRoofArea).toLocaleString()} ㎡（${roofLabel}）× 障碍检修折减 ${config.roof.installRatio}${cfg.ratioFactor < 1 ? ` × 形式折减 ${cfg.ratioFactor}` : ''} → 可安装约 ${roofArea.toLocaleString()} ㎡`
+      : `可用屋顶约 ${roofArea.toLocaleString()} ㎡（${buildingType}·${roofLabel}，可用系数 ${Math.round(roofRatio * 100) / 100}）`
   }
-  const roofArea = Math.round(area * roofRatio)
   const pvKw = Math.max(R.pvMinKw.values, Math.round(roofArea * roofDensity))
   const pvScore = clamp(
     Math.round(40 + Math.min(50, (pvKw / R.pvFullScoreKw.values) * 50) + (isNew ? 5 : 0)),
   )
-  const roofRatioText = Math.round(roofRatio * 100) / 100
 
   // ── 储能：峰谷价差直读分省公开数据（代理购电月度表，日期随 coefficients.js 的 SPREAD_AS_OF 常量），
   //    运行模式按分省分时结构判定（provinces.X.cyclesPerDay，公开数据项，与财务口径同源）；
@@ -143,6 +186,27 @@ export const buildRecommendations = (
   const cyclesPerDay = prov.cyclesPerDay ?? 1
   const SS = config.storageSizing
   const annualKwh = Number(rawAnnualConsumption)
+  // 变压器推定（实填优先，留空按分类型配变指标）：储能定容与需量基数共用
+  const filledKva = Number(rawTransformerKva)
+  const vaPerSqm = SS.transformerVa[buildingType] ?? 80
+  const kva = filledKva > 0 ? Math.round(filledKva) : Math.round((area * vaPerSqm) / 1000)
+  const kvaNote =
+    filledKva > 0
+      ? `实填 ${kva.toLocaleString()} kVA`
+      : `按${buildingType} ${vaPerSqm} VA/㎡ 推定约 ${kva.toLocaleString()} kVA`
+
+  // 需量基数推定（模块② 需量收益与报告注记用，双口径取短板）：
+  //   负荷率法 = 年电量 ÷ 8760 ÷ 分类型负荷率（平均负荷÷最大需量）
+  //   变压器法 = kVA × 功率因数 × 峰值负载率（= 既有平均负载率 ÷ 负荷率，复用既有系数不另立表）
+  const LE = config.loadEstimate
+  const LF = SS.demandLoadFactor?.[buildingType] ?? 0.45
+  const annualKwhValid = Number.isFinite(annualKwh) && annualKwh > 0 ? annualKwh : 0
+  const demandByLoad = annualKwhValid > 0 ? Math.round(annualKwhValid / 8760 / LF) : null
+  const avgLF = LE.transformerLoadFactor[buildingType] ?? 0.3
+  const demandByTrafo = Math.round(kva * LE.transformerPowerFactor * Math.min(0.95, avgLF / LF))
+  const demandBaseKw = Math.round(Math.min(demandByLoad ?? Infinity, demandByTrafo))
+  const demand = { baseKw: demandBaseKw, kva, annualKwh: annualKwhValid }
+
   let storageKwh
   let sizingReasons
   if (isNew || !Number.isFinite(annualKwh) || annualKwh <= 0) {
@@ -154,14 +218,6 @@ export const buildRecommendations = (
     // 负荷口径：日均用电量 × 峰段可转移系数（峰段放电可消纳上限，方案阶段代理系数）
     const dailyKwh = annualKwh / 365
     const eLoad = Math.round(dailyKwh * SS.peakShiftRatio)
-    // 变压器口径：实填报装容量优先，留空按分类型配变指标推定（单位面积 VA/㎡ × 面积）
-    const filledKva = Number(rawTransformerKva)
-    const vaPerSqm = SS.transformerVa[buildingType] ?? 80
-    const kva = filledKva > 0 ? Math.round(filledKva) : Math.round((area * vaPerSqm) / 1000)
-    const kvaNote =
-      filledKva > 0
-        ? `实填 ${kva.toLocaleString()} kVA`
-        : `按${buildingType} ${vaPerSqm} VA/㎡ 推定约 ${kva.toLocaleString()} kVA`
     const eTrafo = Math.round(kva * SS.transformerPowerRatio * SS.hours)
     const binding = Math.min(eLoad, eTrafo)
     // 取整到 50 kWh 工程档；下限保底 500 kWh（rules 门槛）
@@ -189,22 +245,33 @@ export const buildRecommendations = (
   const coolingKw = coolingDesignKw(coolingScale, buildingType, config)
   // 工业厂房冷负荷以工艺发热为主，面积指标先天粗糙 → 置信度如实降级，待工艺资料复核
   const coolingVerify = buildingType === '工业厂房'
+  // 客户侧全生命周期对比（客户视角签单钩子，确定性派生——见 coolingTcoNote 注释）
+  const coolingTco = coolingFits ? coolingTcoNote(province, config) : null
 
   // ── 充电桩：车位实填 → 政策配建实证（置信度 high）；留空 → 类型代理推断（如实降级 verify）。
-  //    换算链与配建表同源：充电车位 = 车位数 × 政策配建比例（1 车位 1 枪）→ ÷2 枪 = 双枪整机桩数 ──
+  //    换算链与配建表同源：充电车位 = 车位数 × 配建比例（1 车位 1 枪）→ ÷2 枪 = 双枪整机桩数。
+  //    配建比例：新建读分省政策档（有源省，公开抽屉可调），未收录省与既有建筑走全国底线 10%（规则表）──
   const GUNS_PER_PILE = 2 // 桩＝120kW 双枪一体整机，与 capexPerPile/dailyKwhPerPile 口径同源
   const filledSpots = Number(rawParkingSpots)
   const hasParking = Number.isFinite(filledSpots) && filledSpots > 0
   // 类型未知时按保守端取值（双枪桩台数口径，与配建表重折口径一致）
   const pilesPer = config.charger.pilesPer10kSqm[buildingType] ?? 2
-  const guns = hasParking ? Math.ceil(filledSpots * R.chargerPolicyRatio.values) : null
+  const provPolicyRatio = isNew ? config.charger.policyRatioByProvince?.[province] : undefined
+  const policyRatio = provPolicyRatio ?? R.chargerPolicyRatio.values
+  const ratioLabel = provPolicyRatio
+    ? `${province}新建政策档`
+    : `政策底线，${isNew ? '该省未收录分省档' : '既有建筑'}，地方标准可上调`
+  const guns = hasParking ? Math.ceil(filledSpots * policyRatio) : null
   const piles = Math.max(
     R.chargerMinPiles.values,
-    hasParking ? Math.ceil(guns / GUNS_PER_PILE) : Math.round((area / 1e4) * pilesPer),
+    hasParking
+      ? Math.ceil(guns / GUNS_PER_PILE)
+      : // 车位未知走类型配建表（按全国底线折算），分省政策档按比例线性放大（外推口径，注明）
+        Math.round((area / 1e4) * pilesPer * (policyRatio / R.chargerPolicyRatio.values)),
   )
   const chargerReason = hasParking
-    ? `实填车位 ${filledSpots.toLocaleString()} 个 × 配建比例 ${Math.round(R.chargerPolicyRatio.values * 100)}%（政策底线，地方标准可上调）→ 充电车位约 ${guns} 个（1 车位 1 枪）→ 双枪整机建议约 ${piles} 桩 ≈ 覆盖 ${piles * GUNS_PER_PILE} 个充电车位`
-    : `按${buildingType}配建水平 ${pilesPer} 桩（双枪一体）/万㎡，建议约 ${piles} 桩 ≈ 覆盖 ${piles * GUNS_PER_PILE} 个充电车位`
+    ? `实填车位 ${filledSpots.toLocaleString()} 个 × 配建比例 ${Math.round(policyRatio * 100)}%（${ratioLabel}）→ 充电车位约 ${guns} 个（1 车位 1 枪）→ 双枪整机建议约 ${piles} 桩 ≈ 覆盖 ${piles * GUNS_PER_PILE} 个充电车位`
+    : `按${buildingType}配建水平 ${pilesPer} 桩（双枪一体）/万㎡${provPolicyRatio ? ` × ${province}政策档 ${Math.round(policyRatio * 100)}%（线性放大，基准表按全国底线折算）` : ''}，建议约 ${piles} 桩 ≈ 覆盖 ${piles * GUNS_PER_PILE} 个充电车位`
   const chargerReasons = [
     chargerReason,
     ...(hasParking
@@ -224,7 +291,7 @@ export const buildRecommendations = (
       suggestedScale: pvKw,
       confidence: 'high',
       reasons: [
-        `可用屋顶约 ${roofArea} ㎡（${buildingType}·${roofLabel}，可用系数 ${roofRatioText}）`,
+        roofSourceNote,
         `按 ${roofDensity} kW/㎡ 装机密度 → 建议约 ${pvKw} kW`,
         ...(isNew
           ? [
@@ -245,6 +312,8 @@ export const buildRecommendations = (
       level: levelOf(storageScore),
       suggestedScale: storageKwh,
       confidence: 'medium',
+      // 需量推定快照：随「填入模块②」传递，储能需量收益与报告注记用（无此快照时②独立测算不计）
+      demand,
       reasons: [
         `当地一般工商业峰谷价差 ${spread.toFixed(2)} 元/kWh（${SPREAD_AS_OF}代理购电口径）`,
         cyclesPerDay >= 2
@@ -256,10 +325,10 @@ export const buildRecommendations = (
         ...(STEADY_LOAD_TYPES.includes(buildingType)
           ? [`${buildingType}全天负荷平稳，储能利用率高`]
           : []),
+        `需量基数推定：${demandByLoad ? `负荷率法约 ${demandByLoad.toLocaleString()} kW 与 ` : ''}变压器法约 ${demandByTrafo.toLocaleString()} kW 取短板 → 最大需量约 ${demandBaseKw.toLocaleString()} kW；两部制按需量计费用户（推定容量 ≥315 kVA）模块② 将计入需量削峰收益`,
         ...sizingReasons,
-        STORAGE_FIRE_LINE,
       ],
-      estimate: estimateOf('storage', storageKwh, province, config),
+      estimate: estimateOf('storage', storageKwh, province, config, demand),
     },
     {
       key: 'cooling',
@@ -286,6 +355,7 @@ export const buildRecommendations = (
         coolingFits
           ? `供冷面积按建筑面积 × ${coolingRatio} 折算（扣除车库/机房/后勤等非供冷区域），如仅部分区域接入请单独测算`
           : `可先评估单体高效机房，区域供冷留待扩建后重估`,
+        ...(coolingTco ? [coolingTco] : []),
         ...(isNew && coolingFits ? ['规划期介入可共享管沟与机房土建，单位投资最低'] : []),
       ],
       estimate: estimateOf('cooling', coolingScale, province, config),
