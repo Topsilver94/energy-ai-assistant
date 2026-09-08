@@ -39,14 +39,17 @@ export default function AIReportPanel({ wide = false }) {
   const isDiagnosisDone = useDiagnosisStore((s) => s.isDiagnosisDone)
   const isGenerating = useAiStore((s) => s.isGenerating)
   const reportContent = useAiStore((s) => s.reportContent)
+  const thinking = useAiStore((s) => s.thinking)
   const error = useAiStore((s) => s.error)
   const apiKey = useAiStore((s) => s.apiKey)
   const baseURL = useAiStore((s) => s.baseURL)
   const modelName = useAiStore((s) => s.modelName)
+  const reasoningEffort = useAiStore((s) => s.reasoningEffort)
   const setGenerating = useAiStore((s) => s.setGenerating)
   const setReportContent = useAiStore((s) => s.setReportContent)
   const setGenerationSource = useAiStore((s) => s.setGenerationSource)
   const appendReport = useAiStore((s) => s.appendReport)
+  const appendThinking = useAiStore((s) => s.appendThinking)
   const setError = useAiStore((s) => s.setError)
   const clearReport = useAiStore((s) => s.clearReport)
   const config = useConfigStore((s) => s.config)
@@ -108,9 +111,11 @@ export default function AIReportPanel({ wide = false }) {
       apiKey,
       baseURL,
       modelName,
+      reasoningEffort,
       system,
       user,
       onChunk: (delta) => appendReport(delta),
+      onThinking: (delta) => appendThinking(delta),
       onComplete: () => {
         setGenerating(false)
         setGenerationSource('ai')
@@ -139,7 +144,7 @@ export default function AIReportPanel({ wide = false }) {
   }
 
   return (
-    <Card className="flex flex-col p-6 print:border-none print:bg-transparent">
+    <Card className="flex flex-col p-6 print:p-0 print:border-none print:bg-transparent">
       <div className="no-print flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded bg-ink-raised text-volt">
@@ -156,7 +161,7 @@ export default function AIReportPanel({ wide = false }) {
       </div>
 
       <p className="no-print mt-4 text-sm leading-relaxed text-paper-mute">
-        自动汇总模块①② 数据，GLM-5 流式生成一页式《综合能源节能改造方案》，支持复制与导出 PDF。
+        自动汇总模块①② 数据，{modelName || 'AI'} 流式生成一页式《综合能源节能改造方案》，支持复制与导出 PDF。
       </p>
 
       {/* 依赖未齐：展示数据流依赖 */}
@@ -189,7 +194,7 @@ export default function AIReportPanel({ wide = false }) {
             生成方案报告
           </Button>
           <p className="mt-3 text-center text-[12px] leading-relaxed text-paper-mute">
-            GLM-5 流式生成 · 未配置 Key 或调用失败时自动回退本地模板
+            {modelName || 'AI'} 流式生成 · 未配置 Key 或调用失败时自动回退本地模板
           </p>
         </div>
       )}
@@ -202,7 +207,7 @@ export default function AIReportPanel({ wide = false }) {
               <>
                 <span className="flex items-center gap-1.5 text-[13px] text-paper-mute">
                   <Loader2 size={14} className="animate-spin text-volt" />
-                  GLM-5 生成中…
+                  {modelName || 'AI'} 生成中…
                 </span>
                 <Button variant="ghost" size="sm" onClick={handleStop}>
                   <Square size={12} />
@@ -232,12 +237,22 @@ export default function AIReportPanel({ wide = false }) {
                   <Printer size={14} />
                   导出 PDF
                 </Button>
+                <span className="text-[12px] text-paper-mute">
+                  打印预览请将「边距」设为「默认」，即按 A4 版心（上下 2.2cm / 左右 2.4cm）输出
+                </span>
               </>
             )}
             {!isGenerating && (
               <span className="ml-auto text-[12px] text-paper-mute">已汇总模块①② · 含当次系数快照</span>
             )}
           </div>
+
+          {/* 推理过程反馈：DeepSeek 等推理模型先思考后出正文，实时字数是「正在工作」的可感信号，避免死等 */}
+          {isGenerating && !hasReport && thinking && (
+            <p className="no-print mt-2 text-[12px] italic text-paper-mute">
+              模型思考中…（已分析 {thinking.length} 字）
+            </p>
+          )}
 
           {/* 降级/错误提示：amber 警示语义 */}
           {error && (
@@ -249,7 +264,7 @@ export default function AIReportPanel({ wide = false }) {
           {/* 报告版式容器：报告头/执行摘要/数据表/报告尾确定性渲染，AI 正文只进正文槽 */}
           <div
             ref={scrollRef}
-            className={`mt-4 flex-1 overflow-y-auto print:max-h-none print:overflow-visible ${
+            className={`mt-4 flex-1 overflow-y-auto print:mt-0 print:max-h-none print:overflow-visible ${
               wide ? 'max-h-[600px]' : 'max-h-[520px]'
             }`}
           >

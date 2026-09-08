@@ -12,7 +12,7 @@
 import { PROJECT_TYPES } from '../stores/projectStore.js'
 import { getRecommendations, eraOf, pvMandatedHint } from './diagnosis.js'
 import { buildPhasing } from './phasing.js'
-import { coolingDesignKw } from './recommend.js'
+import { coolingDesignKw, coolingTcoNote, STORAGE_FIRE_LINE } from './recommend.js'
 import { newBuildMeasures } from '../data/measures.js'
 
 const fmt = (n, digits = 1) => Number(n).toFixed(digits)
@@ -44,6 +44,10 @@ export const keyParams = (systems, config, province) => {
         [
           '分时结构',
           `${prov.cyclesPerDay >= 2 ? '两充两放（第二循环按约半额价差折算）' : '一充一放'}（${province}）`,
+        ],
+        [
+          '工程修正',
+          `效率 ${config.storage.roundTripEfficiency} · DoD ${config.storage.depthOfDischarge} · 年可用 ${config.storage.availableDaysPerYear} 天 · 充电电价 ${config.storage.chargePricePerKwh} 元/kWh`,
         ],
       )
     }
@@ -102,6 +106,20 @@ export const buildReportDraft = (project, diagnosis, config) => {
   const measureTexts = isNew ? newBuildMeasures : recommendations.map((r) => r.text)
   const numberedMeasures = measureTexts.map((text, i) => `${i + 1}. ${text}`).join('\n')
   const phasing = buildPhasing(items, f)
+  // 储能口径句（与报告外壳注记同源）：套利按代理购电固定分时 + 工程修正已计；需量收益计入状态如实
+  const storageItem = items.find((it) => it.type === 'storage')
+  // 集中供冷客户侧对比（确定性派生，客户视角签单钩子；AI 路径由 prompt 注入同款内容）
+  const coolingTcoLine = selected.some((t) => t.key === 'cooling')
+    ? coolingTcoNote(project.inputs.province, config)
+    : null
+  const storageScopeText = storageItem
+    ? `储能套利按代理购电固定分时口径测算（已计效率/放电深度/年可用天数与充电损耗工程修正），市场化交易用户需按现货价差重估（行业情景中枢约下移 30%）；` +
+      (storageItem.demandDetail && !storageItem.demandDetail.skipped
+        ? `需量管理收益已按推定需量基数计入（削峰 ${Math.round(storageItem.demandDetail.shavedKw)} kW）。`
+        : storageItem.demandDetail?.skipped
+          ? '需量管理收益未计入（推定容量低于两部制门槛）。'
+          : '需量管理与现货/需求响应/辅助服务收益未计入确定性测算，属后续深化潜力。')
+    : ''
 
   // 五段正文（二级标题与 GLM-5 版式契约逐字一致；数据表由版式系统渲染，正文只叙述）
   return (
@@ -116,9 +134,11 @@ export const buildReportDraft = (project, diagnosis, config) => {
         : `实际能耗强度 ${fmt(d.actualIntensity)} kWh/㎡·a，对标基准 ${d.benchmarkIntensity ?? '—'} kWh/㎡·a，能效评级「${d.rating ?? '—'}」${d.estimate ? '（电费未知，按预估口径推演，补电费单后转实测对标）' : ''}`
     }\n\n` +
     '## 二、财务分析\n\n' +
-    `组合投资估算 ${fmt(f.totalInvestment, 2)} 万元，年毛收益 ${fmt(f.annualRevenue)} 万元/年，IRR ${fmt((f.irr ?? 0) * 100)} %，静态回收期 ${payback}（按合并现金流测算，共同计算期取各系统寿命最大值）；年碳减排 ${fmt(f.carbonReduction)} tCO₂。分项明细与敏感性结论见执行摘要数据表。\n\n` +
+    `组合投资估算 ${fmt(f.totalInvestment, 2)} 万元，年毛收益 ${fmt(f.annualRevenue)} 万元/年，IRR ${fmt((f.irr ?? 0) * 100)} %，静态回收期 ${payback}（按合并现金流测算，共同计算期取各系统寿命最大值）；年碳减排 ${fmt(f.carbonReduction)} tCO₂。${storageScopeText}分项明细与敏感性结论见执行摘要数据表。\n\n` +
     `## 三、技术路径建议（${isNew ? '新建 · 一体化设计' : '模块① 诊断建议'}）\n\n` +
     `${numberedMeasures || '—'}\n` +
+    // 布置红线仅出模块③（本地路径技术段注记；AI 路径由 prompt 注入同款内容）
+    (storageItem ? `\n> 注：${STORAGE_FIRE_LINE}\n` : '') +
     (era
       ? `\n> 注：建成于 ${di.year} 年 · ${era.label}：${era.focus}。${pvHint ? ` ${pvHint}。` : ''}\n`
       : '') +
@@ -130,6 +150,7 @@ export const buildReportDraft = (project, diagnosis, config) => {
         ? '节能潜力待投产后按实测核算（新建无实际能耗基线）'
         : `节能潜力 **${fmt(d.savingPotential)} %**（能效评级「${d.rating ?? '—'}」）`
     }\n` +
-    `- 组合年碳减排 ${fmt(f.carbonReduction)} tCO₂\n`
+    `- 组合年碳减排 ${fmt(f.carbonReduction)} tCO₂\n` +
+    (coolingTcoLine ? `- ${coolingTcoLine}\n` : '')
   )
 }

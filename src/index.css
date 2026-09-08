@@ -56,19 +56,145 @@ body {
   @apply border border-line px-2 py-1.5 text-left text-paper-mute;
 }
 
-/* 打印适配：白底黑字、隐藏导航与参数面板（模块③ 方案页复用，CLAUDE.md §6） */
+/* 打印适配：正式投资报告版心（模块③ 方案页，CLAUDE.md §6）
+   白底黑字、隐藏导航与参数面板；A4 + 舒展页边距；正文宋体 / 标题黑体；
+   分页控制：块不拆、标题不孤行、表头不悬尾 */
 @media print {
+  /* 页边距必须用 @page：它作用于每一页。容器 padding 只在报告首尾生效，
+     跨页的第二页页顶/页尾会失去边距（页头页尾失调）。核验脚本 page.pdf 需显式传
+     margin（Chromium page.pdf 忽略 @page margin），与浏览器打印保持同一版心。 */
+  @page {
+    size: A4;
+    margin: 2.2cm 2.4cm;
+  }
+
+  html,
   body {
     background: #ffffff !important;
+  }
+  body {
     color: #000000 !important;
   }
   .no-print {
     display: none !important;
   }
+
+  /* 字体系统：正文宋体、标题黑体、数据数字等宽（中文正式报告/咨询文档惯例） */
+  .report-doc,
+  .md {
+    font-family: 'SimSun', 'Songti SC', 'Noto Serif CJK SC', serif;
+  }
+  .report-doc h1,
+  .md h1,
+  .md h2,
+  .report-doc .tracking-widest {
+    font-family: 'SimHei', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
+  }
+  .report-doc .font-mono {
+    font-family: 'JetBrains Mono', 'Courier New', ui-monospace, monospace;
+  }
+
+  /* 字号层级：大标题 18pt / 章节标题 12pt / 正文 11pt / 表格 10pt / 眉题 9pt */
+  .report-doc {
+    font-size: 11pt;
+    line-height: 1.6;
+  }
+  .report-doc h1 {
+    font-size: 18pt;
+  }
+  .report-doc .tracking-widest {
+    font-size: 9pt; /* 眉题：执行摘要 / 分项明细 / 敏感性 / 附表 */
+    font-weight: 600;
+  }
+  .report-doc .text-\[10px\] {
+    font-size: 8pt; /* 数据卡标签（后声明，覆盖眉题 9pt） */
+  }
+  .report-doc .text-\[11px\] {
+    font-size: 9pt; /* 元信息 / 报告尾 / 敏感性注释 */
+  }
+  .report-doc .text-\[12px\] {
+    font-size: 9.5pt; /* 敏感性列表行 */
+  }
+  .report-doc .grid p:last-child {
+    font-size: 15pt; /* 数据卡数值 */
+  }
+  .report-doc table {
+    font-size: 10pt;
+  }
+  .md {
+    font-size: 11pt;
+    line-height: 1.5; /* 正文行距 1.5（用户确认），段间距 6pt、无首行缩进（咨询风） */
+  }
+  .md h2 {
+    font-size: 12pt;
+    border-bottom: none; /* 章节标题不画线，段前段后间距分区（用户确认） */
+  }
+  .md blockquote {
+    font-size: 10pt;
+  }
+
+  /* 执行摘要数据卡去卡片化（屏幕 UI 不动，仅打印）：无边框平面 + 列间细分隔，
+     对齐 DNB 式「小标签 + 大数值」；4 列标签在上、数值在下 */
+  .report-doc .grid > div {
+    background: transparent !important;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+  }
+  .report-doc .grid > div + div {
+    border-left: 0.5pt solid #bbbbbb;
+    padding-left: 8pt;
+  }
+
+  /* 眉题（执行摘要/分项明细/敏感性/附表）：黑体加粗 + 段前间距（JSX mt-3/4/6 承担），
+     章节间不画分隔线，阅读节奏由「段前断后」间距控制（用户确认） */
+
+  /* 段落与列表：无缩进 + 段间距 */
+  .md p,
+  .md ul,
+  .md ol {
+    margin: 0 0 6pt 0;
+  }
+  .md li {
+    margin: 0 0 3pt 0;
+  }
+
+  /* 表格：麦肯锡式极简——去全边框，仅表头重线 + 行细分隔 + 表尾重线，数值右对齐 */
+  .report-doc table,
+  .md table {
+    border-collapse: collapse;
+  }
+  .report-doc th,
+  .report-doc td,
+  .md th,
+  .md td {
+    border: none;
+    border-top: 0.5pt solid #bbbbbb;
+    padding: 4pt 6pt;
+    text-align: left;
+    vertical-align: middle;
+  }
+  .report-doc thead th,
+  .md thead th {
+    border-bottom: 1.5pt solid #000000; /* 表头重线 */
+  }
+  .report-doc table:first-of-type th:nth-child(n + 2),
+  .report-doc table:first-of-type td:nth-child(n + 2),
+  .report-doc table:last-of-type th:nth-child(n + 2),
+  .report-doc table:last-of-type td:nth-child(n + 2) {
+    text-align: right; /* 分项明细：规模/投资/IRR/回收期/碳减排；附表：数值列 */
+  }
+  .report-doc table tr:last-child td,
+  .md table tr:last-child td {
+    border-bottom: 1.5pt solid #000000; /* 表尾重线闭合 */
+  }
+
+  /* 颜色收敛：全黑、白底对比度达标；暗色卡片/表头底全清 */
   .md,
   .md p,
   .md ul,
   .md ol,
+  .md li,
   .md td,
   .md strong,
   .report-doc,
@@ -77,8 +203,17 @@ body {
   .report-doc li,
   .report-doc span,
   .report-doc label,
-  .report-doc td {
+  .report-doc td,
+  .report-doc h1,
+  .report-doc .text-volt,
+  .report-doc .text-amber {
     color: #000000 !important;
+  }
+  .report-doc .grid > div,
+  .report-doc td,
+  .report-doc tr,
+  .report-doc thead {
+    background: transparent !important;
   }
   .md th,
   .report-doc th {
@@ -87,13 +222,28 @@ body {
   }
   .md blockquote {
     border-color: #999999 !important;
-    color: #333333 !important;
+    color: #000000 !important;
   }
-  .report-doc th,
-  .report-doc td {
-    border-color: #999999 !important;
+  .report-doc > div:first-child {
+    border-color: #888888 !important; /* 报告头下分隔线收敛为中性灰（章节间不画线） */
   }
-  .md h2 {
-    border-color: #999999 !important;
+
+  /* 分页控制：眉题不孤行、长表可跨页且表头重复、段落不拆孤字 */
+  .md h2,
+  .report-doc .tracking-widest {
+    break-after: avoid;
+  }
+  .md p,
+  .report-doc p {
+    orphans: 3;
+    widows: 3;
+  }
+  .md ul,
+  .md ol,
+  .md blockquote {
+    break-inside: avoid;
+  }
+  .report-doc thead {
+    display: table-header-group;
   }
 }

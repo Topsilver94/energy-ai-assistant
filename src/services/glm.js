@@ -1,9 +1,12 @@
 /**
- * GLM-5 流式服务（OpenAI 兼容接口，CLAUDE.md §7）
+ * AI 流式服务（OpenAI 兼容接口，CLAUDE.md §7；baseURL/modelName 来自「API 设置」，适配 GLM-5 / DeepSeek 等）
  *
  * 职责拆分：
  *   buildPrompt          纯函数：把模块①② 快照 + 系数拼装成 system/user 消息（可单测）
  *   generateReportStream 服务函数：fetch + ReadableStream 解析 SSE，逐 chunk 回调
+ *
+ * DeepSeek v4 系为推理模型：先流 reasoning_content（应用侧作「思考中」反馈，绝不并入正文）再流 content。
+ * 推理强度经 reasoning_effort 控制：low 将首段正文延迟压至 ~5s，medium/high 推理可达数十秒。
  *
  * 错误分型（必须给明确提示，不静默失败）：noKey / auth(401) / http / network / aborted
  * 红线：apiKey 只经请求头传输，不写日志、不持久化。
@@ -11,9 +14,10 @@
 import { PROJECT_TYPES } from '../stores/projectStore.js'
 import { buildPhasing } from '../utils/phasing.js'
 import { buildSensitivity } from '../utils/sensitivity.js'
-import { coolingDesignKw, STORAGE_FIRE_LINE } from '../utils/recommend.js'
+import { coolingDesignKw, coolingTcoNote, STORAGE_FIRE_LINE } from '../utils/recommend.js'
 import { newBuildMeasures } from '../data/measures.js'
 import { eraOf, pvMandatedHint } from '../utils/diagnosis.js'
+import { SPREAD_AS_OF } from '../data/coefficients.js'
 
 const SYSTEM_PROMPT =
   '你是一位拥有 15 年经验的综合能源资深专家，擅长光伏、储能、供冷及节能改造项目的财务分析与技术落地。' +
@@ -84,6 +88,22 @@ export const buildPrompt = (project, diagnosis, config) => {
     selected.some((t) => t.key === 'pv') && selected.some((t) => t.key === 'storage') && storageCycles >= 2
       ? '光储协同：午间第二循环充电窗口与光伏大发时段重叠，可消纳光伏余电、提升自用率并防逆流（定性提示，收益仍按峰谷价差口径计）'
       : null
+  // 储能口径边界与需量注记（确定性内容，同报告版式外壳注记；AI 仅润色，不得改数字与方向）
+  const storageScopeLine =
+    `测算口径：套利按电网代理购电固定分时（${SPREAD_AS_OF}代理购电表），已计系统效率/放电深度/年可用天数与充电损耗工程修正；` +
+    '用户转入市场化交易后固定分时价差不再执行，收益需按现货价差重估（行业情景中枢约下移 30%）'
+  const dd = items.find((it) => it.type === 'storage')?.demandDetail
+  const demandLine = dd && !dd.skipped
+    ? `需量管理收益已计入：推定最大需量约 ${Math.round(dd.baseKw)} kW，削峰 ${Math.round(dd.shavedKw)} kW × ${dd.price.toFixed(0)} 元/kW·月（两部制按需量计费推定，计费方式以电费单「基本电费」科目核定，容量计费用户无此项收益${dd.monthlyPerKva >= 260 ? '；月每 kVA 用电 ≥260 kWh 按 90% 档' : ''}）`
+    : dd?.skipped
+      ? '需量管理收益未计入：推定变压器容量低于两部制门槛 315 kVA，按单一制口径'
+      : '需量管理收益未计入（无模块① 诊断负荷推定）'
+  const upsideLine =
+    '收益深化潜力（未计入测算数字，属或有收益，可定性提及、严禁虚构数字）：现货市场套利（市场化用户轨道）；需求响应/虚拟电厂聚合（上海案例结算价最高约 9 元/kWh）；辅助服务（调峰/调频/备用）；深化路径为 15 分钟级负荷曲线实测 + 逐时仿真'
+  // 集中供冷客户侧对比（确定性派生，同模块① 冷却触发依据；AI 仅润色不改数字）
+  const coolingTco = selected.some((t) => t.key === 'cooling')
+    ? coolingTcoNote(project.inputs.province, config)
+    : null
 
   const user =
     '请根据以下项目数据生成一份 1 页式综合能源改造方案：\n\n' +
@@ -102,8 +122,14 @@ export const buildPrompt = (project, diagnosis, config) => {
     (selected.some((t) => t.key === 'storage')
       ? '【储能运行与布置（确定性内容，请保留标准号与数字，仅润色措辞）】\n' +
         `${storageModeLine}\n` +
+        `${storageScopeLine}\n` +
+        `${demandLine}\n` +
         (pvStorageSynergy ? `${pvStorageSynergy}\n` : '') +
+        `${upsideLine}\n` +
         `${STORAGE_FIRE_LINE}\n\n`
+      : '') +
+    (selected.some((t) => t.key === 'cooling') && coolingTco
+      ? '【集中供冷客户价值（确定性内容，请保留数字，仅润色措辞）】\n' + `${coolingTco}\n\n`
       : '') +
     '【敏感性分析（系统按单变量扰动确定性重算，请保留全部数字与结论，仅润色措辞）】\n' +
     (sens ? sens.summaryLines.map((l) => `- ${l}`).join('\n') : '—') +
@@ -153,9 +179,11 @@ export const generateReportStream = ({
   apiKey,
   baseURL,
   modelName = 'glm-5',
+  reasoningEffort,
   system,
   user,
   onChunk,
+  onThinking,
   onError,
   onComplete,
 }) => {
@@ -173,6 +201,9 @@ export const generateReportStream = ({
         body: JSON.stringify({
           model: modelName || 'glm-5',
           stream: true,
+          // DeepSeek v4 推理强度：low 把首段正文延迟压到 ~5s（medium/high 推理可达数十秒，
+          // 应用侧默认 low）；GLM-5 忽略该参数，不影响默认路径
+          ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
           messages: [
             { role: 'system', content: system },
             { role: 'user', content: user },
@@ -222,11 +253,14 @@ export const generateReportStream = ({
           if (!data || data === '[DONE]') continue
           try {
             const json = JSON.parse(data)
-            const delta = json.choices?.[0]?.delta?.content ?? ''
-            if (delta) {
-              full += delta
-              onChunk(delta)
+            const delta = json.choices?.[0]?.delta ?? {}
+            const text = delta.content ?? ''
+            if (text) {
+              full += text
+              onChunk(text)
             }
+            // 推理过程独立回调：应用侧只作「思考中」反馈，不并入 reportContent（红线）
+            if (delta.reasoning_content) onThinking?.(delta.reasoning_content)
           } catch {
             /* 半包或心跳行，跳过等下一轮补齐 */
           }

@@ -6,6 +6,7 @@ import { useAiStore } from '../../stores/aiStore'
 import { useConfigStore } from '../../stores/configStore'
 import { buildSensitivity } from '../../utils/sensitivity'
 import { keyParams } from '../../utils/report'
+import { SPREAD_AS_OF } from '../../data/coefficients'
 
 const fmt = (n, digits = 1) => Number(n).toFixed(digits)
 
@@ -30,6 +31,7 @@ export default function ReportDocument({ children }) {
   const logoDataUrl = useAiStore((s) => s.logoDataUrl)
   const isGenerating = useAiStore((s) => s.isGenerating)
   const generationSource = useAiStore((s) => s.generationSource)
+  const modelName = useAiStore((s) => s.modelName)
 
   const f = feasibility?.total ?? {}
   const items = feasibility?.items ?? []
@@ -64,11 +66,12 @@ export default function ReportDocument({ children }) {
   const typeLabel = d?.buildingType ?? di.buildingType ?? '—'
   const areaText = Number.isFinite(Number(di.area)) ? Number(di.area).toLocaleString() : '—'
   const metaLine = `${pInputs.province} · ${isNew ? '新建' : '既有'}${typeLabel}建筑 · ${areaText} ㎡ · ${date}`
+  const providerLabel = modelName || 'AI'
   const sourceBadge = isGenerating
-    ? 'GLM-5 生成中'
+    ? `${providerLabel} 生成中`
     : generationSource === 'local'
       ? '本地模板（降级）'
-      : 'GLM-5'
+      : providerLabel
 
   // LOGO 上传：本地图选文件 → FileReader dataURL → 内存态（槽位即入口，点击上传/更换）
   const handleLogoFile = (e) => {
@@ -83,7 +86,7 @@ export default function ReportDocument({ children }) {
   return (
     <div className="report-doc">
       {/* 报告头：标题 + 元信息 + 生成方式徽章；LOGO 槽位固定右上（打印保留，未上传隐藏占位） */}
-      <div className="flex items-start justify-between gap-4 border-b border-line pb-4">
+      <div className="flex items-start justify-between gap-4 border-b border-line pb-4 print:break-inside-avoid">
         <div className="min-w-0">
           <h1 className="text-xl font-bold">综合能源节能改造方案</h1>
           <p className="mt-1.5 text-[12px] text-paper-mute">{metaLine}</p>
@@ -105,7 +108,7 @@ export default function ReportDocument({ children }) {
               onChange={handleLogoFile}
             />
           </label>
-          <span className="rounded-full border border-line px-2 py-0.5 text-[10px] text-paper-mute">
+          <span className="no-print rounded-full border border-line px-2 py-0.5 text-[10px] text-paper-mute">
             {sourceBadge}
           </span>
         </div>
@@ -120,7 +123,7 @@ export default function ReportDocument({ children }) {
           { label: '回收期 · 年', value: paybackText },
           { label: '年碳减排 · tCO₂', value: fmt(f.carbonReduction) },
         ].map((c) => (
-          <div key={c.label} className="rounded-lg border border-line bg-ink-raised p-3">
+          <div key={c.label} className="rounded-lg border border-line bg-ink-raised p-3 print:break-inside-avoid">
             <p className="text-[10px] uppercase tracking-widest text-paper-mute">{c.label}</p>
             <p
               className={`tabular mt-1.5 font-mono text-xl font-semibold ${
@@ -134,6 +137,7 @@ export default function ReportDocument({ children }) {
       </div>
 
       <p className="mt-4 text-[11px] uppercase tracking-widest text-paper-mute">分项明细</p>
+      {/* 长表允许跨页（打印表头重复），避免整块推挤造成页尾大空白 */}
       <table className="mt-2 w-full border-collapse text-sm">
         <thead>
           <tr className="border border-line bg-ink-raised text-left font-semibold">
@@ -169,7 +173,7 @@ export default function ReportDocument({ children }) {
       <p className="mt-3 text-[11px] uppercase tracking-widest text-paper-mute">
         敏感性分析（单变量扰动 ±10% / ±20%）
       </p>
-      <ul className="mt-1.5 space-y-1">
+      <ul className="mt-1.5 space-y-1 print:break-inside-avoid">
         {sens.summaryLines.map((line) => (
           <li key={line} className="text-[12px] leading-relaxed text-paper-mute">
             {line}
@@ -182,6 +186,31 @@ export default function ReportDocument({ children }) {
           ? ' 光储协同：午间第二循环充电窗口与光伏大发时段重叠，可消纳光伏余电、提升自用率并防逆流（定性提示，收益仍按峰谷价差口径计）。'
           : ''}
       </p>
+
+      {/* 储能口径边界与需量注记（确定性文字，AI 正文与此同源）：套利按代理购电固定分时，
+          已计工程修正；需量收益按模块① 推定快照计入或如实注明未计 */}
+      {selected.some((t) => t.key === 'storage') && (
+        <p className="mt-2 text-[11px] leading-relaxed text-paper-mute">
+          储能套利按电网代理购电固定分时口径测算（{SPREAD_AS_OF}代理购电表），已计系统效率 / 放电深度 /
+          年可用天数与充电损耗工程修正；用户转入市场化交易后固定分时价差不再执行，收益需按现货价差重估（行业情景中枢约下移
+          30%，可用敏感性电价轴初判抗压性）。
+          {(() => {
+            const dd = items.find((it) => it.type === 'storage')?.demandDetail
+            if (dd && !dd.skipped)
+              return ` 需量管理收益已计入：推定最大需量 ${Math.round(dd.baseKw).toLocaleString()} kW × 削峰 ${Math.round(dd.shavedKw).toLocaleString()} kW × ${dd.price.toFixed(0)} 元/kW·月（两部制按需量计费推定，计费方式以电费单「基本电费」科目核定——容量计费用户无此项收益${dd.monthlyPerKva >= 260 ? '；月每 kVA 用电 ≥260 kWh 按 90% 档执行' : ''}）。`
+            if (dd?.skipped)
+              return ' 需量管理收益未计入：推定变压器容量低于两部制门槛（315 kVA），按单一制口径。'
+            return ' 需量管理收益未计入（未采纳模块① 诊断或无负荷推定数据）。'
+          })()}
+        </p>
+      )}
+      {selected.some((t) => t.key === 'storage') && (
+        <p className="mt-2 text-[11px] leading-relaxed text-paper-mute">
+          收益深化潜力（未计入上述测算数字，属或有收益）：现货市场套利（市场化用户轨道，与固定分时口径互斥）；需求响应
+          / 虚拟电厂聚合（上海案例结算价最高约 9 元/kWh）；辅助服务（调峰 / 调频 / 备用）。深化路径：以 15
+          分钟级实测负荷曲线替代类型推定系数，逐时仿真核定储能定容与需量削峰策略。
+        </p>
+      )}
 
       {/* 正文槽：AI 流式五段（或本地模板降级正文），标题/间距由 .md 样式锁定 */}
       <div className="md mt-2">{children}</div>
@@ -202,12 +231,12 @@ export default function ReportDocument({ children }) {
       </table>
 
       {/* 报告尾：版权 + 保密 + 免责（交付文档惯例；开源声明在应用页脚，不进报告） */}
-      <div className="mt-6 border-t border-line pt-3">
+      <div className="mt-6 border-t border-line pt-3 print:break-inside-avoid">
         <p className="text-[11px] text-paper-mute">
           © 2026 综合能源 AI 助手 · 保密文件，仅供项目团队内部使用
         </p>
         <p className="mt-1 text-[11px] leading-relaxed text-paper-mute">
-          免责声明：本方案由演示工具生成，测算基于公开参考数据与可调演示系数（数据来源见应用内「公开平台数据参考」），未含现场勘察与负荷实测；结果供决策参考，不构成投资承诺。
+          免责声明：本方案由演示工具生成，测算基于公开参考数据与可调演示系数（数据来源见应用内「电力市场数据 / 工程估算参考」），未含现场勘察与负荷实测；结果供决策参考，不构成投资承诺。
         </p>
       </div>
     </div>

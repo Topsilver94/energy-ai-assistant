@@ -17,21 +17,23 @@ export default function ApiSettingsModal({ open, onClose }) {
   const apiKey = useAiStore((s) => s.apiKey)
   const baseURL = useAiStore((s) => s.baseURL)
   const modelName = useAiStore((s) => s.modelName)
+  const reasoningEffort = useAiStore((s) => s.reasoningEffort)
   const setApiKey = useAiStore((s) => s.setApiKey)
   const setBaseURL = useAiStore((s) => s.setBaseURL)
   const setModelName = useAiStore((s) => s.setModelName)
+  const setReasoningEffort = useAiStore((s) => s.setReasoningEffort)
 
-  const [draft, setDraft] = useState({ apiKey, baseURL, modelName })
+  const [draft, setDraft] = useState({ apiKey, baseURL, modelName, reasoningEffort })
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState(null)
 
   // 每次打开同步已保存配置；Esc 关闭；打开期间锁背景滚动
   useEffect(() => {
     if (open) {
-      setDraft({ apiKey, baseURL, modelName })
+      setDraft({ apiKey, baseURL, modelName, reasoningEffort })
       setTestResult(null)
     }
-  }, [open, apiKey, baseURL, modelName])
+  }, [open, apiKey, baseURL, modelName, reasoningEffort])
 
   useEffect(() => {
     if (!open) return undefined
@@ -94,6 +96,7 @@ export default function ApiSettingsModal({ open, onClose }) {
     setApiKey(draft.apiKey.trim())
     setBaseURL(draft.baseURL.trim())
     setModelName(draft.modelName.trim() || 'glm-5')
+    setReasoningEffort(draft.reasoningEffort)
     onClose()
   }
 
@@ -160,6 +163,32 @@ export default function ApiSettingsModal({ open, onClose }) {
               className={`${inputClass} font-mono text-[13px]`}
             />
           </label>
+
+          <div>
+            <span className="mb-1.5 block text-[13px] text-paper-mute">推理强度</span>
+            <div className="flex rounded-xl bg-ink-raised p-1">
+              {[
+                { v: '', label: '不指定' },
+                { v: 'low', label: '低延迟' },
+              ].map((o) => (
+                <button
+                  key={o.v}
+                  type="button"
+                  onClick={() => setDraft((d) => ({ ...d, reasoningEffort: o.v }))}
+                  className={`flex-1 rounded-lg px-3 py-2 text-[13px] transition-colors ${
+                    draft.reasoningEffort === o.v
+                      ? 'bg-volt font-semibold text-ink'
+                      : 'text-paper-mute hover:text-paper'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-[11px] leading-relaxed text-paper-mute">
+              DeepSeek 等推理模型选「低延迟」（首段正文约 5 秒）；GLM 等直出模型保持「不指定」。
+            </p>
+          </div>
         </div>
 
         {testResult && (
