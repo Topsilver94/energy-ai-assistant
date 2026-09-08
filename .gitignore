@@ -8,3 +8,7 @@ dist/
 # verify 回归脚本的可再生工件（截图/JSON），脚本本身入库
 verify/out/
 verify/shots/
+verify/aikey.txt
+
+# 本机网络代理辅助脚本（个人环境，不入库）
+proxy-github.cjs

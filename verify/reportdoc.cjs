@@ -1,6 +1,27 @@
 // 版式外壳回归核验：ReportDocument 确定性渲染的关键区块断言（本地降级路径）
-// 用法：BASE_URL=<url> NODE_PATH=<playwright路径> node verify/reportdoc.cjs
+// 用法：BASE_URL=<url> node verify/reportdoc.cjs（playwright 自动解析自 npx 缓存）
 // 链路：完成①② → 模块③ 未填 Key 生成（本地模板降级）→ 断言报告外壳结构
+const path = require('path')
+const fs = require('fs')
+
+// playwright 自动解析：先补齐 module.paths（本地 node_modules → npx 缓存），再 require
+try {
+  require.resolve('playwright')
+} catch {
+  const candidates = [
+    path.join(process.env.LOCALAPPDATA || '', 'npm-cache', '_npx'),
+    path.join(process.env.APPDATA || '', 'npm-cache', '_npx'),
+  ]
+  for (const npx of candidates) {
+    let dirs
+    try {
+      dirs = fs.readdirSync(npx)
+    } catch {
+      continue
+    }
+    for (const d of dirs) module.paths.push(path.join(npx, d, 'node_modules'))
+  }
+}
 const { chromium } = require('playwright')
 const BASE = process.env.BASE_URL || 'http://localhost:5173'
 

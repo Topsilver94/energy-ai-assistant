@@ -56,9 +56,14 @@ const bodyText = (page) => page.evaluate(() => document.body.textContent.replace
     await page.waitForTimeout(600)
   }
 
-  // 2) 默认年份 2010 → 节能 50% 代际；价差月份文案经 SPREAD_AS_OF 常量渲染（回归）
+  // 2) 默认年份 2010 → 节能 50% 代际；价差月份文案经 SPREAD_AS_OF 常量渲染（回归——月份从源文件动态读取，换月不破）
+  const spreadAsOf = (
+    fs
+      .readFileSync(path.join(__dirname, '..', 'src', 'data', 'coefficients.js'), 'utf8')
+      .match(/SPREAD_AS_OF = '([^']+)'/) || []
+  )[1]
   await page.locator('input[placeholder="如 10000"]').fill('20000')
-  await page.locator('input[placeholder="如 80"]').fill('200')
+  await page.locator('input[placeholder^="留空按典型强度"]').fill('200')
   await runDiagnosis()
   let body = await bodyText(page)
   check(
@@ -67,7 +72,10 @@ const bodyText = (page) => page.evaluate(() => document.body.textContent.replace
       '建成于 2010 年 · 节能 50%（GB 50189-2005）：围护基础一般，优先外窗与照明改造，机电按寿命窗口统筹替换。',
     ),
   )
-  check('spreadMonthViaConstant', body.includes('（2026年8月代理购电口径）'))
+  check(
+    'spreadMonthViaConstant',
+    Boolean(spreadAsOf) && body.includes(`（${spreadAsOf}代理购电口径）`),
+  )
 
   // 3) 1980 → 节能标准实施前
   await setYear(1980)

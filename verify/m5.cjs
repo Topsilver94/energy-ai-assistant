@@ -1,7 +1,7 @@
 // 全链路验证脚本 · 双界面切换 + 动态配置中心联动
 // 链路：完成①② → 演示模式三列同屏（状态保留）→ 回工作模式（状态不丢）
 //       → 专家参数：光伏造价 3.5→3.0 保存 → 组合投资 820→720 自动重算
-//       → 恢复默认 → 820 → 公开数据：广东电价 0.75→0.9 → 毛收益 211.0→239.4
+//       → 恢复默认 → 820 → 电力市场数据：广东电价 0.75→0.9 → 毛收益 200.2→228.6（9月价差口径）
 //         （储能收益按分省峰谷价差 × 分时循环独立计，电价轴现只影响光伏收益与供冷购电成本）
 //       → 公开数据：办公屋面可用系数 0.4→0.5 → 模块① 推荐光伏 800→1000 kW 自动重算
 //         （屋面/供冷折算/充电桩配建参考表迁入公开抽屉后的联动回归）
@@ -45,7 +45,7 @@ const dataCards = (page) =>
   await page.locator('text=组合投资').first().waitFor({ timeout: 5000 })
   await page.locator('nav[aria-label="模块导航"] button:has-text("挖掘痛点")').click()
   await page.locator('input[placeholder="如 10000"]').fill('20000')
-  await page.locator('input[placeholder="如 80"]').fill('200')
+  await page.locator('input[placeholder^="留空按典型强度"]').fill('200')
   await page.locator('button:has-text("开始诊断")').click()
   await page.locator('text=节能潜力').first().waitFor({ timeout: 5000 })
   log('准备完成：①② 已测算')
@@ -96,28 +96,30 @@ const dataCards = (page) =>
   report.extracted.afterRestore = await dataCards(page)
   log('恢复默认 → 820.00 复现')
 
-  // ── 5. 公开数据：广东电价 0.75 → 0.9 ──
-  await page.locator('button:has-text("公开平台数据参考")').click()
-  const pub = page.locator('[aria-label="公开平台数据参考配置"]')
-  await pub.waitFor({ timeout: 5000 })
-  report.extracted.publicGroups = await pub.locator('h4').allTextContents()
+  // ── 5. 电力市场数据抽屉：广东电价 0.75 → 0.9 ──
+  await page.locator('button:has-text("电力市场数据")').click()
+  const power = page.locator('[aria-label="电力市场数据配置"]')
+  await power.waitFor({ timeout: 5000 })
+  report.extracted.powerGroups = await power.locator('h4').allTextContents()
   // 分省工商业电价组内，广东字段行：标签「广东」的行内 input
-  const gdRow = pub.locator('section:has(h4:text("分省工商业电价")) div.grid', { hasText: /^广东/ }).first()
+  const gdRow = power.locator('section:has(h4:text("分省工商业电价")) div.grid', { hasText: /^广东/ }).first()
   await gdRow.locator('input[type="number"]').fill('0.9')
-  await pub.locator('button:has-text("保存配置")').click()
+  await power.locator('button:has-text("保存配置")').click()
   await page.waitForTimeout(600)
   report.extracted.afterPriceChange = await dataCards(page)
   await page.screenshot({ path: path.join(shotDir, 'm5-03-after-price.png'), fullPage: true })
-  log('公开数据保存（广东电价 0.9）→ 自动重算')
+  log('电力市场数据保存（广东电价 0.9）→ 自动重算')
 
-  // ── 6. 公开数据：办公屋面可用系数 0.4 → 0.5 → 模块① 推荐光伏规模自动重算 ──
-  await page.locator('button:has-text("公开平台数据参考")').click()
-  await pub.waitFor({ timeout: 5000 })
-  const roofRow = pub
+  // ── 6. 工程估算参考抽屉：办公屋面可用系数 0.4 → 0.5 → 模块① 推荐光伏规模自动重算 ──
+  await page.locator('button:has-text("工程估算参考")').click()
+  const ref = page.locator('[aria-label="工程估算参考配置"]')
+  await ref.waitFor({ timeout: 5000 })
+  report.extracted.referenceGroups = await ref.locator('h4').allTextContents()
+  const roofRow = ref
     .locator('section:has(h4:text("屋面光伏参考")) div.grid', { hasText: /^办公/ })
     .first()
   await roofRow.locator('input[type="number"]').fill('0.5')
-  await pub.locator('button:has-text("保存配置")').click()
+  await ref.locator('button:has-text("保存配置")').click()
   await page.waitForTimeout(600)
   await page.locator('nav[aria-label="模块导航"] button:has-text("挖掘痛点")').click()
   await page.waitForTimeout(400)
@@ -126,21 +128,36 @@ const dataCards = (page) =>
     return { pv1000Kw: body.includes('建议约 1000 kW') }
   })
   await page.screenshot({ path: path.join(shotDir, 'm5-04-after-roof.png'), fullPage: true })
-  log('公开数据保存（办公屋面系数 0.5）→ 模块① 推荐光伏 800→1000 kW 重算')
+  log('工程估算参考保存（办公屋面系数 0.5）→ 模块① 推荐光伏 800→1000 kW 重算')
 
-  // ── 7. 收尾恢复默认（不留脏状态给后续使用者）──
-  await page.locator('button:has-text("公开平台数据参考")').click()
-  await pub.waitFor({ timeout: 5000 })
-  await pub.locator('button:has-text("恢复默认")').click()
-  await pub.locator('button:has-text("保存配置")').click()
+  // ── 7. 分抽屉恢复默认：工程抽屉恢复 → 电力抽屉的改动应保留（新语义回归守护）──
+  await page.locator('button:has-text("工程估算参考")').click()
+  await ref.waitFor({ timeout: 5000 })
+  await ref.locator('button:has-text("恢复默认")').click()
+  await ref.locator('button:has-text("保存配置")').click()
   await page.waitForTimeout(400)
-  report.extracted.finalState = await dataCards(page)
   await page.locator('nav[aria-label="模块导航"] button:has-text("挖掘痛点")').click()
   await page.waitForTimeout(400)
   report.extracted.finalRoofRestored = await page.evaluate(() =>
     document.body.textContent.replace(/\s+/g, ' ').includes('建议约 800 kW'),
   )
-  log('已恢复默认系数（模块① 推荐光伏回到 800 kW）')
+  log('工程估算参考恢复默认（模块① 推荐光伏回到 800 kW，电力抽屉改动应保留）')
+
+  // ── 8. 电力市场数据抽屉恢复默认（收尾不留脏状态）──
+  await page.locator('button:has-text("电力市场数据")').click()
+  await power.waitFor({ timeout: 5000 })
+  // 分抽屉恢复语义守护：工程抽屉的恢复默认不应波及电力抽屉——广东电价应仍为 0.9
+  const gdValueBeforeRestore = await gdRow.locator('input[type="number"]').inputValue()
+  report.extracted.powerUntouchedByRefRestore = gdValueBeforeRestore
+  await power.locator('button:has-text("恢复默认")').click()
+  await power.locator('button:has-text("保存配置")').click()
+  await page.waitForTimeout(400)
+  await page.locator('nav[aria-label="模块导航"] button:has-text("锁定收益")').click()
+  await page.waitForTimeout(400)
+  report.extracted.finalState = await dataCards(page)
+  log(
+    `电力市场数据恢复默认（恢复前广东电价 ${gdValueBeforeRestore}（分抽屉语义${gdValueBeforeRestore === '0.9' ? ' ✓' : ' ✗'}），已回 0.75 全默认态）`,
+  )
 
   await browser.close()
   fs.writeFileSync(path.join(outDir, 'm5.json'), JSON.stringify(report, null, 2))

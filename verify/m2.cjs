@@ -1,7 +1,7 @@
 // 全链路验证脚本 · 模块① 挖掘痛点（工作模式，经 WorkNav 切页）
 // 场景A 既有办公：20000㎡ · 2010年 · 年电费200万 · 广东
 //   预期：强度133.3 / 潜力25.0%（基准100，商务办公口径）/ 评级需改进 / 推荐分 储72(可考虑,800kWh 双口径定容) Pv45(谨慎,200kW·可用系数重标保守端) 桩45(4桩·枪口径重折为双枪整机台数) 冷28
-//         （储能按广东 2026年8月 实际峰谷价差 1.2655 元/kWh 判定，升至可考虑档并居首；25%<30% 措施不再标重点）
+//         （储能按广东 2026年9月 实际峰谷价差 1.3529 元/kWh 判定，升至可考虑档并居首；25%<30% 措施不再标重点）
 //   一键填入 → 模块② 仅 storage=800 启用（pv 掉至谨慎档不再自动采纳，卡上 amber 徽章仍可见）
 // 场景B 新建办公：20000㎡ · 设计强度120（> 约束100 → 超标）；再测留空（按约束值预估）
 //   预期：不输出节能潜力
@@ -63,7 +63,8 @@ const log = (m) => {
   })
 
   // 储能定容双口径（既有·变压器留空 → 推定 20000㎡×80VA/㎡=1600kVA → 1600×25%×2h=800；
-  // 负荷口径 日均 7306kWh×0.35=2557，短板 800）+ 广东两充两放运行模式行 + 布置红线双出口之推荐侧
+  // 负荷口径 日均 7306kWh×0.35=2557，短板 800）+ 广东两充两放运行模式行；
+  // 布置红线仅出模块③（推荐侧不出现——投资推荐简明、方案兜底，2026-09 确认）
   report.extracted.storageSizing = await page.evaluate(() => {
     const body = document.body.textContent.replace(/\s+/g, ' ')
     return {
@@ -71,7 +72,7 @@ const log = (m) => {
       hasTrafoCaliber: body.includes('变压器口径：按办公 80 VA/㎡ 推定约 1,600 kVA'),
       hasShortfall: body.includes('按短板定容约 800 kWh'),
       hasTwoCycleMode: body.includes('广东分时结构支持两充两放（谷充峰放全额价差 + 平充峰放约半额价差）'),
-      hasFireLine: body.includes('布置红线：户外电池舱（柜）间防火间距 ≥3 m'),
+      noFireLineInStep1: !body.includes('布置红线'),
     }
   })
 
@@ -190,6 +191,8 @@ const log = (m) => {
     hasIndex: mallBody.includes('负荷指标 200 W/㎡'),
     hasNetArea: mallBody.includes('供冷面积 1.8 万㎡'),
     hasRatioNote: mallBody.includes('建筑面积 × 0.9 折算'),
+    // 客户侧 TCO：分体 48.5（电费 12.5+维保 6+折旧 30）vs 集中 37.5 → 年省 11.0 元/㎡（23%）
+    hasTco: mallBody.includes('客户侧全生命周期对比') && mallBody.includes('年省约 11.0 元/㎡'),
   }
   await page.screenshot({ path: path.join(shotDir, 'm2-06-mall-cooling.png'), fullPage: true })
   log('场景D 既有商场双口径诊断完成')
@@ -289,6 +292,38 @@ const log = (m) => {
   })
   await page.screenshot({ path: path.join(shotDir, 'm2-10-parking.png'), fullPage: true })
   log('场景G 车位实填（充电桩实证口径）完成')
+
+  // ── 场景H：屋面面积实填（塔楼/综合体形态系数失真场景的实证口径）──
+  //    既有办公·平屋面·实填 4,000 ㎡：4,000 × 0.8 障碍折减 × 1.0 = 3,200 ㎡ × 0.1 kW/㎡ = 320 kW
+  //    （推定口径 200 kW＝20,000 × 0.1 × 1.0 × 0.1，场景A 已回归；E 设过坡屋面，先复位平屋面）
+  await page.locator('select').nth(2).selectOption('平屋面')
+  await page.locator('input[placeholder="留空按类型系数估算"]').fill('4000')
+  await page.locator('button:has-text("开始诊断")').click()
+  await page.waitForTimeout(600)
+  report.extracted.roofAreaFilled = await page.evaluate(() => {
+    const body = document.body.textContent.replace(/\s+/g, ' ')
+    return {
+      hasFilledChain: body.includes('实填屋面 4,000 ㎡（平屋面）× 障碍检修折减 0.8 → 可安装约 3,200 ㎡'),
+      has320Kw: body.includes('建议约 320 kW'),
+    }
+  })
+  await page.screenshot({ path: path.join(shotDir, 'm2-11-roof-filled.png'), fullPage: true })
+  log('场景H 屋面实填（光伏实证换算链 4,000㎡→320kW）完成')
+
+  // ── 场景I：新建广东·车位实填 → 分省政策档（广东 20%，替代全国底线 10%）──
+  //    120 位 × 20% = 24 枪（充电车位）→ ÷2 = 12 桩；既有建筑仍走底线（场景G 10% 已回归）
+  await page.locator('button:has-text("新建建筑")').click()
+  await page.locator('button:has-text("开始诊断")').click()
+  await page.waitForTimeout(600)
+  report.extracted.provPolicyRatio = await page.evaluate(() => {
+    const body = document.body.textContent.replace(/\s+/g, ' ')
+    return {
+      has20Pct: body.includes('实填车位 120 个 × 配建比例 20%（广东新建政策档）'),
+      has12Piles: body.includes('双枪整机建议约 12 桩 ≈ 覆盖 24 个充电车位'),
+    }
+  })
+  await page.screenshot({ path: path.join(shotDir, 'm2-12-prov-charger.png'), fullPage: true })
+  log('场景I 新建广东分省配建档（120 位 × 20% → 12 桩）完成')
 
   await browser.close()
   fs.writeFileSync(path.join(outDir, 'm2.json'), JSON.stringify(report, null, 2))
