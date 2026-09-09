@@ -5,6 +5,7 @@ import ExpertPanel from './components/layout/ExpertPanel'
 import ApiSettingsModal from './components/layout/ApiSettingsModal'
 import ModeSwitch from './components/layout/ModeSwitch'
 import WorkNav from './components/layout/WorkNav'
+import WorkTabs from './components/layout/WorkTabs'
 import CalculatorModule from './components/calculator'
 import DiagnosisModule from './components/diagnosis'
 import AIReportPanel from './components/aiReport/AIReportPanel'
@@ -44,10 +45,17 @@ export default function App() {
       />
 
       {mode === 'work' ? (
-        /* 工作模式：横向满宽（max-w-6xl），模块内部表单/结果双栏并排，
-           尽量一屏收纳不下滑；导航固定在屏幕左缘（WorkNav） */
-        <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-6 print:px-0 print:py-0">
-          <section className="min-w-0">{activeModule.node}</section>
+        /* 工作模式：外包两栏 —— 左列 spacer 为 fixed 悬浮的 WorkNav 让出等高占位，
+           内容在「导航右侧剩余空间」内 mx-auto 真居中（左右空隙对称，修偏/空隙不均）；
+           <md WorkNav 隐藏改顶部 WorkTabs，内容不再被书签遮挡 */
+        <main className="flex w-full flex-1 print:block">
+          <div className="hidden w-11 shrink-0 print:hidden md:block" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 print:px-0 print:py-0">
+              <WorkTabs active={activeKey} onChange={setActiveKey} className="mb-4 md:hidden" />
+              <section className="min-w-0">{activeModule.node}</section>
+            </div>
+          </div>
         </main>
       ) : (
         /* 演示模式：三列同屏全貌 */
@@ -60,10 +68,16 @@ export default function App() {
             </p>
           </section>
 
-          <div className="grid gap-6 lg:grid-cols-3 print:block">
-            <DiagnosisModule wide={false} />
-            <CalculatorModule wide={false} />
-            <AIReportPanel wide={false} />
+          <div className="grid gap-6 lg:grid-cols-[repeat(3,minmax(0,1fr))] print:block">
+            <div className="min-w-0">
+              <DiagnosisModule wide={false} />
+            </div>
+            <div className="min-w-0">
+              <CalculatorModule wide={false} />
+            </div>
+            <div className="min-w-0">
+              <AIReportPanel wide={false} />
+            </div>
           </div>
         </main>
       )}

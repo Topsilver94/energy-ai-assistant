@@ -55,6 +55,7 @@ export default function AIReportPanel({ wide = false }) {
   const config = useConfigStore((s) => s.config)
 
   const [copied, setCopied] = useState(false)
+  const [exportHint, setExportHint] = useState(false)
   const copiedTimer = useRef(null)
   const genController = useRef(null)
   const scrollRef = useRef(null)
@@ -141,6 +142,12 @@ export default function AIReportPanel({ wide = false }) {
       window.clearTimeout(copiedTimer.current)
       copiedTimer.current = window.setTimeout(() => setCopied(false), 1500)
     }
+  }
+
+  // 导出 PDF：可打印环境走 window.print()；手机/内嵌 iframe 环境 print() 静默无效，
+  // 触发引导提示改走系统「分享→打印→存储为 PDF」（export.js 能力检测）
+  const handleExport = () => {
+    exportPdf({ onUnsupported: () => setExportHint(true) })
   }
 
   return (
@@ -233,7 +240,7 @@ export default function AIReportPanel({ wide = false }) {
                     </>
                   )}
                 </Button>
-                <Button variant="ghost" size="sm" onClick={exportPdf}>
+                <Button variant="ghost" size="sm" onClick={handleExport}>
                   <Printer size={14} />
                   导出 PDF
                 </Button>
@@ -258,6 +265,14 @@ export default function AIReportPanel({ wide = false }) {
           {error && (
             <p className="no-print mt-2 text-[13px] leading-relaxed text-amber" role="alert">
               {error}
+            </p>
+          )}
+
+          {/* 导出引导：当前环境不支持 window.print() 时的反馈（替代「点了没反应」） */}
+          {exportHint && !isGenerating && (
+            <p className="no-print mt-2 text-[13px] leading-relaxed text-amber" role="alert">
+              当前环境（手机 / 内嵌预览）不支持直接打印 —— 请用浏览器菜单导出：
+              「分享 → 打印 → 存储为 PDF」。
             </p>
           )}
 

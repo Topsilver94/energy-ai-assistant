@@ -1,5 +1,6 @@
 import { Activity, Loader2 } from 'lucide-react'
 import Button from '../ui/Button'
+import ProvincePicker from '../ui/ProvincePicker'
 import { useDiagnosisStore } from '../../stores/diagnosisStore'
 import { benchmarkTypes } from '../../data/benchmarks.js'
 import { recommendationRules } from '../../data/recommendationRules.js'
@@ -26,7 +27,6 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
   const setInput = useDiagnosisStore((s) => s.setInput)
   const config = useConfigStore((s) => s.config)
 
-  const provinces = Object.keys(config.provinces)
   const roofOptions = Object.keys(config.roof.types)
   const isNew = inputs.buildingNature === 'new'
   const benchmark = config.benchmarks[inputs.buildingType] ?? '—'
@@ -112,17 +112,7 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
 
         <label className="block">
           <span className="mb-1.5 block text-[13px] text-paper-mute">地点（省份）</span>
-          <select
-            value={inputs.province}
-            onChange={(e) => setInput({ province: e.target.value })}
-            className={inputClass}
-          >
-            {provinces.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
+          <ProvincePicker value={inputs.province} onChange={(p) => setInput({ province: p })} />
         </label>
       </div>
 

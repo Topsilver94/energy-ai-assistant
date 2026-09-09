@@ -27,7 +27,7 @@ export default function WorkNav({ active, onChange }) {
   return (
     <nav
       aria-label="模块导航"
-      className="no-print fixed left-0 top-28 z-30 flex flex-col gap-2"
+      className="no-print fixed left-0 top-28 z-30 hidden flex-col gap-2 md:flex"
     >
       {STEPS.map((s) => {
         const isActive = s.key === active

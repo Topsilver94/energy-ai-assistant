@@ -1,7 +1,7 @@
 import { Calculator, Check, Loader2 } from 'lucide-react'
 import Button from '../ui/Button'
 import { PROJECT_TYPES, useProjectStore } from '../../stores/projectStore'
-import { useConfigStore } from '../../stores/configStore'
+import ProvincePicker from '../ui/ProvincePicker'
 
 const inputClass =
   'w-full rounded-xl bg-ink-raised px-3 py-2.5 text-[15px] text-paper outline-none transition-shadow placeholder:text-paper-faint focus:ring-2 focus:ring-volt'
@@ -16,10 +16,6 @@ export default function FeasibilityForm({ onSubmit, loading = false }) {
   const setInput = useProjectStore((s) => s.setInput)
   const setSystem = useProjectStore((s) => s.setSystem)
   const toggleSystem = useProjectStore((s) => s.toggleSystem)
-  const config = useConfigStore((s) => s.config)
-
-  // 省份列表直接来自 configStore（系数改了省份也跟着走）
-  const provinces = Object.keys(config.provinces)
   const selected = PROJECT_TYPES.filter((t) => inputs.systems[t.key].enabled)
 
   return (
@@ -32,17 +28,7 @@ export default function FeasibilityForm({ onSubmit, loading = false }) {
     >
       <label className="block">
         <span className="mb-1.5 block text-[13px] text-paper-mute">地点（省份）</span>
-        <select
-          value={inputs.province}
-          onChange={(e) => setInput({ province: e.target.value })}
-          className={inputClass}
-        >
-          {provinces.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
+        <ProvincePicker value={inputs.province} onChange={(p) => setInput({ province: p })} />
       </label>
 
       {/* 系统多选卡片：综合能源方案按组合测算 */}
