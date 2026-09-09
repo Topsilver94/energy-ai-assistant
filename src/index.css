@@ -68,9 +68,18 @@ body {
     margin: 2.2cm 2.4cm;
   }
 
+  /* 重置屏幕深色声明：屏幕样式 html{color-scheme:dark}（index.css 顶部）让部分打印引擎
+     （小米/国产浏览器无「背景图形」开关）把页面画布按深色渲染——正文外一圈黑边即此。
+     这里在打印媒体内强制切回浅色画布，并对 html/body 加 print-color-adjust: exact，
+     使白底不依赖打印对话框「背景图形」勾选即可输出（用户无开关或默认不勾也正确）。 */
+  html {
+    color-scheme: light;
+  }
   html,
   body {
     background: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   body {
     color: #000000 !important;

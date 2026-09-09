@@ -26,9 +26,13 @@ const BASE = process.env.BASE_URL || 'http://localhost:5173'
 const OUT = path.join(__dirname, 'out', 'print-report.pdf')
 
 /**
- * 解析 PDF 内容流，取出每页开头的页面级 cm 变换与裁剪盒，换算成实际页边距（pt→cm）。
+ * 解析 PDF 内容流，取出每页内容盒裁剪盒，换算成实际页边距（pt→cm）。
  * Chromium 每页结构：`.24 缩放 + y 翻转 cm` → `qx qy w h re W* n` 裁剪盒。
  * 裁剪盒在内容坐标系，左/下边距 = qx×0.24，上边距 = 841.92 − (qy+h)×0.24（A4 高 841.92pt）。
+ *
+ * 注意：打印样式若重置 html{color-scheme:light}（打印黑边修复，见 index.css @media print），
+ * Chromium 会在每页最前多画一条「整页画布」clip（左 0 上 0、占满全页）——它无边距，
+ * 不是内容盒。此处取裁剪盒列表里「非占满整页」的第一条，跳过画布层，避免误判版心。
  */
 function pdfMargins(pdfPath) {
   const zlib = require('zlib')
@@ -43,9 +47,15 @@ function pdfMargins(pdfPath) {
     let t
     try { t = zlib.inflateSync(b.subarray(start, start + raw.length)).toString('latin1') } catch { continue }
     if (!/^\.\d+\s+0\s+0\s+-\.\d+/.test(t)) continue // 页面级 cm
-    const clip = t.match(/([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+re[\s\S]*?W\*?\s*n/)
-    if (!clip) continue
-    const qx = parseFloat(clip[1]), qy = parseFloat(clip[2]), h = parseFloat(clip[4])
+    // 内容盒裁剪：Chromium 画「白画布」用 `… re\nf`（填充），真正版心裁剪盒是紧跟 `re` 直接
+    // W* n 的一条（外层坐标系 `x y w h re\nW* n`）。color-scheme:light（打印黑边修复）会先画
+    // 一层整页画布 `0 0 612 956 re\nf`——它 re 后是 f 非 W，故不受影响。若页面无 W 裁剪盒
+    // （理论不出现）则回退取任一 re 片段兜底。
+    const cre = /([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+re\s*W\*?\s*n/g
+    let c
+    const box = cre.exec(t)?.slice(1, 5).map(parseFloat) ?? t.match(/([\d.-]+)\s+([\d.-]+)\s+[\d.-]+\s+[\d.-]+\s+re/)?.slice(1, 3).concat([0, 0]).map(parseFloat)
+    if (!box) continue
+    const [qx, qy, , h] = box
     margins.push({
       left: qx * 0.24 / 72 * 2.54,
       top: (841.92 - (qy + h) * 0.24) / 72 * 2.54,
@@ -90,6 +100,9 @@ function pdfMargins(pdfPath) {
     const any = (sel) => getComputedStyle(document.querySelectorAll(sel)[0])
     return {
       bodyBg: cs('body').backgroundColor,
+      htmlScheme: cs('html').colorScheme,
+      htmlBg: cs('html').backgroundColor,
+      printAdjust: cs('body').printColorAdjust || cs('body').webkitPrintColorAdjust,
       reportFont: any('.report-doc').fontFamily,
       h1Font: any('.report-doc h1').fontFamily,
       h1Size: parseFloat(any('.report-doc h1').fontSize),
@@ -127,6 +140,9 @@ function pdfMargins(pdfPath) {
     console.log(`${cond ? 'PASS' : 'FAIL'}  ${label}`)
   }
   check(`正文底色白（${styles.bodyBg}）`, styles.bodyBg === 'rgb(255, 255, 255)')
+  check(`打印画布重置浅色（colorScheme=${styles.htmlScheme}）`, styles.htmlScheme === 'light')
+  check(`html 底白（${styles.htmlBg}）`, styles.htmlBg === 'rgb(255, 255, 255)')
+  check(`白底不依赖背景图形开关（printAdjust=${styles.printAdjust}）`, /^exact$/.test(styles.printAdjust || ''))
   check(`报告字体含宋体（${styles.reportFont.slice(0, 30)}）`, /SimSun|serif/i.test(styles.reportFont))
   check(`标题字体含黑体（${styles.h1Font.slice(0, 30)}）`, /SimHei|sans-serif/i.test(styles.h1Font))
   check(`报告标题字号 18pt（${styles.h1Size}px）`, styles.h1Size >= 23)
