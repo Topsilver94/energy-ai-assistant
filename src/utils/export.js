@@ -26,14 +26,16 @@ export const copyText = async (text) => {
 }
 
 /**
- * 环境能否走 window.print()：iOS Safari 与沙箱/嵌入 iframe 中 print() 是静默 no-op
- * （不弹打印界面也不报错），必须检测后引导用户走系统「分享/打印」，避免按钮无反馈。
+ * 环境能否走 window.print()：手机/触屏浏览器（含 Android Chrome、微信内嵌 WebView）与
+ * 沙箱/嵌入 iframe 中 print() 可能是静默 no-op（不弹打印界面也不报错）——必须检测后引导
+ * 用户改走系统「分享/打印」，避免按钮无反馈。桌面真实浏览器照常走原生打印框。
  */
 export const canBrowserPrint = () => {
   try {
     if (typeof window === 'undefined' || typeof window.print !== 'function') return false
-    // iOS Safari（iPhone/iPad/iPod）：print() 存在但无打印界面
-    if (/iP(hone|ad|od)/.test(navigator.userAgent)) return false
+    // 手机/移动浏览器（iOS Safari 无打印界面；Android 系统浏览器可用但部分 WebView/微信内核静默 no-op，
+    // 一律引导改走系统菜单，保证「点按钮必有反馈」）
+    if (/Android|iPhone|iPad|iPod|Mobile|Opera Mini|IEMobile/i.test(navigator.userAgent)) return false
     // 沙箱/跨域 iframe：window.print 被忽略（缺 allow-modals），跨域顶层访问本身会抛错
     if (window.self !== window.top) return false
     return true

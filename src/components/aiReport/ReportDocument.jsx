@@ -137,8 +137,10 @@ export default function ReportDocument({ children }) {
       </div>
 
       <p className="mt-4 text-[11px] uppercase tracking-widest text-paper-mute">分项明细</p>
-      {/* 长表允许跨页（打印表头重复），避免整块推挤造成页尾大空白 */}
-      <table className="mt-2 w-full border-collapse text-sm">
+      {/* 长表允许跨页（打印表头重复），避免整块推挤造成页尾大空白；
+          窄屏容器内横滑看全列（列宽不压扁、不出阅读区），打印时恢复铺满 A4 版心 */}
+      <div className="mt-2 overflow-x-auto print:overflow-visible">
+        <table className="w-full min-w-[560px] border-collapse text-sm">
         <thead>
           <tr className="border border-line bg-ink-raised text-left font-semibold">
             <th className="px-2 py-1.5">系统</th>
@@ -168,7 +170,11 @@ export default function ReportDocument({ children }) {
             )
           })}
         </tbody>
-      </table>
+        </table>
+      </div>
+      <p className="mt-1 text-[11px] leading-relaxed text-paper-mute md:hidden">
+        可左右滑动查看完整分项明细
+      </p>
 
       <p className="mt-3 text-[11px] uppercase tracking-widest text-paper-mute">
         敏感性分析（单变量扰动 ±10% / ±20%）
@@ -219,7 +225,9 @@ export default function ReportDocument({ children }) {
       <p className="mt-6 text-[11px] uppercase tracking-widest text-paper-mute">
         附：当次测算关键参数
       </p>
-      <table className="mt-2 w-full border-collapse text-sm">
+      {/* 附表同窄屏横滑保障：参数名/值在超窄容器也不被裁 */}
+      <div className="mt-2 overflow-x-auto print:overflow-visible">
+        <table className="w-full border-collapse text-sm">
         <tbody>
           {params.map(([k, v]) => (
             <tr key={k} className="border border-line">
@@ -228,7 +236,8 @@ export default function ReportDocument({ children }) {
             </tr>
           ))}
         </tbody>
-      </table>
+        </table>
+      </div>
 
       {/* 报告尾：版权 + 保密 + 免责（交付文档惯例；开源声明在应用页脚，不进报告） */}
       <div className="mt-6 border-t border-line pt-3 print:break-inside-avoid">

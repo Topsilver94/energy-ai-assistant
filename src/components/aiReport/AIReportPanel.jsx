@@ -33,6 +33,29 @@ import { copyText, exportPdf } from '../../utils/export'
  *   并以 amber 提示明确告知原因，不静默失败
  * - 导出：复制（剪贴板 + 兜底）/ 导出 PDF（window.print + 打印样式，仅输出本卡）
  */
+/**
+ * 竖排图标工具钮（图标在上 / 文字在下）：STEP3 报告顶部操作条专用——手机上比横排
+ * 文字钮更省横向空间、触控面更大；复制成功切换为对勾 + volt 选中态。
+ */
+function ToolTile({ icon: Icon, label, onClick, pressed = false }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={pressed}
+      title={label}
+      className={`flex flex-col items-center justify-center gap-1 rounded-lg border px-3.5 py-1.5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-volt ${
+        pressed
+          ? 'border-volt/40 bg-volt/10 text-volt'
+          : 'border-line bg-ink-raised/50 text-paper-mute hover:border-paper-mute hover:text-paper'
+      }`}
+    >
+      <Icon size={17} strokeWidth={2.25} />
+      <span className="text-[11px] leading-none">{label}</span>
+    </button>
+  )
+}
+
 /** wide（工作模式）：满宽阅读，方案渲染区加高，尽量一页收纳 */
 export default function AIReportPanel({ wide = false }) {
   const isFeasibleDone = useProjectStore((s) => s.isFeasibleDone)
@@ -206,53 +229,39 @@ export default function AIReportPanel({ wide = false }) {
         </div>
       )}
 
-      {/* 生成中 / 已生成：操作栏 + Markdown 渲染区 */}
+      {/* 生成中 / 已生成：顶部竖排图标操作条 + 说明行 + Markdown 渲染区 */}
       {(hasReport || isGenerating) && (
         <>
-          <div className="no-print mt-4 flex items-center gap-2">
+          <div className="no-print mt-4 flex flex-wrap items-center gap-2">
             {isGenerating ? (
               <>
                 <span className="flex items-center gap-1.5 text-[13px] text-paper-mute">
                   <Loader2 size={14} className="animate-spin text-volt" />
                   {modelName || 'AI'} 生成中…
                 </span>
-                <Button variant="ghost" size="sm" onClick={handleStop}>
-                  <Square size={12} />
-                  停止
-                </Button>
+                <ToolTile icon={Square} label="停止" onClick={handleStop} />
               </>
             ) : (
               <>
-                <Button variant="ghost" size="sm" onClick={handleGenerate}>
-                  <RefreshCw size={14} />
-                  重新生成
-                </Button>
-                <Button variant="ghost" size="sm" onClick={handleCopy}>
-                  {copied ? (
-                    <>
-                      <Check size={14} className="text-volt" />
-                      已复制
-                    </>
-                  ) : (
-                    <>
-                      <Copy size={14} />
-                      复制内容
-                    </>
-                  )}
-                </Button>
-                <Button variant="ghost" size="sm" onClick={handleExport}>
-                  <Printer size={14} />
-                  导出 PDF
-                </Button>
-                <span className="text-[12px] text-paper-mute">
-                  打印预览请将「边距」设为「默认」，即按 A4 版心（上下 2.2cm / 左右 2.4cm）输出
-                </span>
+                <ToolTile icon={RefreshCw} label="重新生成" onClick={handleGenerate} />
+                <ToolTile
+                  icon={copied ? Check : Copy}
+                  label={copied ? '已复制' : '复制内容'}
+                  pressed={copied}
+                  onClick={handleCopy}
+                />
+                <ToolTile icon={Printer} label="导出 PDF" onClick={handleExport} />
               </>
             )}
-            {!isGenerating && (
-              <span className="ml-auto text-[12px] text-paper-mute">已汇总模块①② · 含当次系数快照</span>
-            )}
           </div>
+
+          {/* 说明行：按钮下方独立成行，不再与操作钮混排（打印边距 + 汇总口径） */}
+          {!isGenerating && (
+            <p className="no-print mt-1.5 text-[12px] leading-relaxed text-paper-mute">
+              已汇总模块①② · 含当次系数快照 · 打印预览请将「边距」设为「默认」，按 A4 版心（上下 2.2cm /
+              左右 2.4cm）输出
+            </p>
+          )}
 
           {/* 推理过程反馈：DeepSeek 等推理模型先思考后出正文，实时字数是「正在工作」的可感信号，避免死等 */}
           {isGenerating && !hasReport && thinking && (

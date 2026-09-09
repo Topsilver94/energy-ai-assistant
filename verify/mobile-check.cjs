@@ -35,6 +35,14 @@ const assertNoHOverflow = async (page, label) => {
   return m
 }
 
+// 断言：目标横向滚动容器自身可滑（scrollWidth > clientWidth = 卡片内横滑看全列、不外溢文档）
+const measureHScroll = (page, sel) =>
+  page.evaluate((s) => {
+    const el = document.querySelector(s)
+    if (!el) return null
+    return { scroll: el.scrollWidth, client: el.clientWidth }
+  }, sel)
+
 ;(async () => {
   const browser = await chromium.launch()
   const context = await browser.newContext({
@@ -74,6 +82,11 @@ const assertNoHOverflow = async (page, label) => {
   else note('窄屏 WorkNav 已隐藏')
   if (!(await workTabs.isVisible())) fail('窄屏未渲染 WorkTabs 顶部分页')
   else note('窄屏 WorkTabs 顶部分页可见')
+  const tabsInHeader = await page.evaluate(
+    () => !!document.querySelector('header nav[aria-label="模块导航（移动）"]'),
+  )
+  if (!tabsInHeader) fail('移动分页未并入 header（应随顶栏 sticky 常驻）')
+  else note('移动分页已并入 header，随顶栏常驻')
 
   await assertNoHOverflow(page, '①诊断页')
 
@@ -116,8 +129,13 @@ const assertNoHOverflow = async (page, label) => {
   await page.locator('button[aria-pressed]:has-text("储能")').click()
   await page.locator('label:has-text("储能 规模") input').fill('1000')
   await page.locator('button:has-text("开始测算")').click()
-  await page.locator('text=组合投资').first().waitFor({ timeout: 5000 })
+  // 等待测算真出结果（「组合年毛收益」仅结果态存在，空态占位不含），避免在 300ms 计算窗口内测到空态
+  await page.locator('text=组合年毛收益').first().waitFor({ timeout: 5000 })
   await assertNoHOverflow(page, '②测算结果页')
+  const t2 = await measureHScroll(page, 'div.overflow-x-auto')
+  if (t2 && t2.scroll > t2.client)
+    note(`STEP2 分项表卡片内横滑看全列（${t2.client}px → ${t2.scroll}px）`)
+  else fail('STEP2 分项表未形成「卡片内横滑」容器（右列可能仍被裁）')
   note('模块② 组合测算完成')
   await page.screenshot({ path: path.join(shotDir, 'mobile-2-calc.png'), fullPage: true })
 
@@ -135,6 +153,10 @@ const assertNoHOverflow = async (page, label) => {
   await page.locator('text=不支持直接打印').first().waitFor({ timeout: 3000 })
   note('导出 PDF 点击有引导反馈（手机环境改走系统「分享→打印→存储为 PDF」）')
   await assertNoHOverflow(page, '③方案页')
+  const t3 = await measureHScroll(page, '.report-doc .overflow-x-auto')
+  if (t3 && t3.scroll > t3.client)
+    note(`STEP3 分项明细卡片内横滑看全列（${t3.client}px → ${t3.scroll}px）`)
+  else fail('STEP3 分项明细未形成「卡片内横滑」容器（右列可能仍被裁）')
   await page.screenshot({ path: path.join(shotDir, 'mobile-3-report.png'), fullPage: true })
 
   // ── 演示模式：窄屏单列无横溢 ──

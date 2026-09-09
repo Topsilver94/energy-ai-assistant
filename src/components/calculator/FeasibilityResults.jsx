@@ -64,7 +64,7 @@ export default function FeasibilityResults() {
   const payback = total.paybackPeriod === 'N/A' ? 'N/A' : total.paybackPeriod.toFixed(1)
 
   return (
-    <div className="mt-5">
+    <div className="mt-5 min-w-0">
       {/* 组合总账 */}
       <div className="grid grid-cols-2 gap-3">
         <DataCard icon={Wallet} label="组合投资 · 万元" value={total.totalInvestment.toFixed(2)} />
@@ -77,9 +77,9 @@ export default function FeasibilityResults() {
         修改「专家参数」保存后自动重算
       </p>
 
-      {/* 分项明细表 */}
-      <div className="mt-4 overflow-hidden rounded-lg border border-line">
-        <table className="w-full text-[13px]">
+      {/* 分项明细表：窄屏容器内横滑看全列（列宽不压扁、不出卡片），宽屏照常铺满 */}
+      <div className="mt-4 overflow-x-auto rounded-lg border border-line">
+        <table className="w-full min-w-[480px] text-[13px]">
           <thead>
             <tr className="border-b border-line bg-ink-raised text-[11px] uppercase tracking-widest text-paper-mute">
               <th className="px-3 py-2 text-left font-semibold">系统</th>
@@ -122,7 +122,10 @@ export default function FeasibilityResults() {
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-[12px] leading-relaxed text-paper-mute">
+      <p className="mt-1.5 text-[11px] leading-relaxed text-paper-mute md:hidden">
+        表格超出屏幕时可左右滑动查看全部列
+      </p>
+      <p className="mt-1 text-[12px] leading-relaxed text-paper-mute">
         组合 IRR / 回收期按合并现金流测算（共同计算期取各系统寿命最大值，到期归零）；
         充电桩不计碳减排（交通过程减排不核算），表中以「—」示意。
       </p>

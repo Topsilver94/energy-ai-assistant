@@ -1,13 +1,24 @@
 import { Database, KeyRound, LineChart, Settings, Zap } from 'lucide-react'
 import Button from '../ui/Button'
+import WorkTabs from './WorkTabs'
 
 /**
- * 顶栏：品牌（左）+ 四个入口（右）
+ * 顶栏：品牌（左）+ 四个入口（右）；整体 sticky 常驻。
  * 🔑 API 设置（AI 接口弹窗）；⚙️ 专家参数（可调系数与财务假设抽屉）；
  * 📈 电力市场数据（分省电价/价差/分时/利用小时，随月度换版）；
  * 🗄 工程估算参考（按建筑类型查表，方案阶段估算）
+ * 工作模式窄屏（<md）：第二行并入移动分页 WorkTabs（01/02/03 胶囊），
+ * 随顶栏一起固定——切步不必滚回顶部。
  */
-export default function Header({ onOpenSettings, onOpenExpert, onOpenPower, onOpenReference }) {
+export default function Header({
+  onOpenSettings,
+  onOpenExpert,
+  onOpenPower,
+  onOpenReference,
+  mode = 'work',
+  active = 'diag',
+  onNavigate = () => {},
+}) {
   return (
     <header className="no-print sticky top-0 z-30 border-b border-line bg-ink/90 backdrop-blur">
       {/* min-h + flex-wrap：极端窄视口（<375）右组换行兜底不溢出；常规宽度单行等高于原 h-16 */}
@@ -43,6 +54,14 @@ export default function Header({ onOpenSettings, onOpenExpert, onOpenPower, onOp
           </Button>
         </div>
       </div>
+
+      {/* 工作模式窄屏：移动分页并入顶栏第二行（随顶栏 sticky，切步无需滚回顶部）；
+          ≥md 由 WorkNav 悬浮书签接管，此行隐藏 */}
+      {mode === 'work' && (
+        <div className="border-t border-line/70 px-3 py-1.5 md:hidden sm:px-6">
+          <WorkTabs active={active} onChange={onNavigate} />
+        </div>
+      )}
     </header>
   )
 }

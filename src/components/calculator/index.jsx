@@ -91,14 +91,16 @@ export default function CalculatorModule({ wide = false }) {
 
       {/* 功能描述句置于「开始测算」按钮之后；wide 布局下跟随左列表单列 */}
       {wide ? (
-        <div className="mt-5 grid items-start gap-x-6 lg:grid-cols-2">
-          <div>
+        <div className="mt-5 grid min-w-0 items-start gap-x-6 lg:grid-cols-2">
+          <div className="min-w-0">
             <FeasibilityForm onSubmit={handleSubmit} loading={loading} />
             <p className="mt-3 text-sm leading-relaxed text-paper-mute">
               勾选系统组合、填规模与省份，即时估算组合投资与收益。
             </p>
           </div>
-          <FeasibilityResults />
+          <div className="min-w-0">
+            <FeasibilityResults />
+          </div>
         </div>
       ) : (
         <>

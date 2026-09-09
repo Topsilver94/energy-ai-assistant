@@ -1,11 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Header from './components/layout/Header'
 import StepNav from './components/layout/StepNav'
 import ExpertPanel from './components/layout/ExpertPanel'
 import ApiSettingsModal from './components/layout/ApiSettingsModal'
 import ModeSwitch from './components/layout/ModeSwitch'
 import WorkNav from './components/layout/WorkNav'
-import WorkTabs from './components/layout/WorkTabs'
 import CalculatorModule from './components/calculator'
 import DiagnosisModule from './components/diagnosis'
 import AIReportPanel from './components/aiReport/AIReportPanel'
@@ -35,6 +34,11 @@ export default function App() {
   ]
   const activeModule = modules.find((m) => m.key === activeKey) ?? modules[0]
 
+  // 切换分页后滚回顶部：顶栏（含移动分页/悬浮书签）常驻，正文应从该步起点展示
+  useEffect(() => {
+    window.scrollTo({ top: 0 })
+  }, [activeKey])
+
   return (
     <div className="flex min-h-screen flex-col">
       <Header
@@ -42,6 +46,9 @@ export default function App() {
         onOpenExpert={() => setDrawer('expert')}
         onOpenPower={() => setDrawer('power')}
         onOpenReference={() => setDrawer('reference')}
+        mode={mode}
+        active={activeKey}
+        onNavigate={setActiveKey}
       />
 
       {mode === 'work' ? (
@@ -52,7 +59,7 @@ export default function App() {
           <div className="hidden w-11 shrink-0 print:hidden md:block" aria-hidden />
           <div className="min-w-0 flex-1">
             <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 print:px-0 print:py-0">
-              <WorkTabs active={activeKey} onChange={setActiveKey} className="mb-4 md:hidden" />
+              {/* 移动分页 01/02/03 已并入 Header 第二行随顶栏 sticky，内容区不再渲染 */}
               <section className="min-w-0">{activeModule.node}</section>
             </div>
           </div>
