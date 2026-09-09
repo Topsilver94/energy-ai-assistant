@@ -53,3 +53,29 @@ export const exportPdf = ({ onUnsupported } = {}) => {
   onUnsupported?.()
   return false
 }
+
+/**
+ * 手机端「导出为 PDF」操作指引：分系统给准确路径——
+ * Android 打印走「浏览器菜单→打印」（系统「分享」面板没有打印，小米/国产浏览器常见误区）；
+ * iOS 才走 Safari「分享→打印」；无打印菜单的国产浏览器给换浏览器 + 复制到 WPS 兜底。
+ */
+export const exportGuideHint = () => {
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''
+  if (/Android/i.test(ua)) {
+    return (
+      '当前设备不支持直接调起打印。请在浏览器右上角「菜单（⋮）→ 打印」中，打印目标选' +
+      '「另存为 PDF / 保存为 PDF」。若菜单里没有「打印」（部分国产浏览器），请用 Chrome 或 Edge ' +
+      '打开本页再打印，或点「复制内容」粘贴到 WPS / Word 导出。'
+    )
+  }
+  if (/iP(hone|ad|od)/i.test(ua)) {
+    return (
+      '当前设备不支持直接调起打印。请在 Safari 点「分享 → 打印」，右上角选「存储为 PDF」导出；' +
+      '或点「复制内容」粘贴到 WPS / Word 导出。'
+    )
+  }
+  return (
+    '当前环境（内嵌 / 受限）不支持直接调起打印：请在系统浏览器（Chrome / Edge / Safari）中打开本页，' +
+    '用浏览器菜单「打印 → 另存为 PDF」导出，或点「复制内容」粘贴到 WPS / Word 导出。'
+  )
+}

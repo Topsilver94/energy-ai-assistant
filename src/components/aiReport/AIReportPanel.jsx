@@ -22,7 +22,7 @@ import { useAiStore } from '../../stores/aiStore'
 import { useConfigStore } from '../../stores/configStore'
 import { buildPrompt, generateReportStream } from '../../services/glm'
 import { buildReportDraft } from '../../utils/report'
-import { copyText, exportPdf } from '../../utils/export'
+import { copyText, exportGuideHint, exportPdf } from '../../utils/export'
 
 /**
  * 模块③ 订制方案（AI 方案生成）面板（Sprint 4：GLM-5 流式主流程）
@@ -277,11 +277,10 @@ export default function AIReportPanel({ wide = false }) {
             </p>
           )}
 
-          {/* 导出引导：当前环境不支持 window.print() 时的反馈（替代「点了没反应」） */}
+          {/* 导出引导：当前设备不支持 window.print() 时的分设备指引（替代「点了没反应」） */}
           {exportHint && !isGenerating && (
             <p className="no-print mt-2 text-[13px] leading-relaxed text-amber" role="alert">
-              当前环境（手机 / 内嵌预览）不支持直接打印 —— 请用浏览器菜单导出：
-              「分享 → 打印 → 存储为 PDF」。
+              {exportGuideHint()}
             </p>
           )}
 

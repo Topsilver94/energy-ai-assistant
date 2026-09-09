@@ -150,7 +150,7 @@ const measureHScroll = (page, sel) =>
   else note('未填 Key → 本地模板降级 + amber 提示')
 
   await page.locator('button:has-text("导出 PDF")').click()
-  await page.locator('text=不支持直接打印').first().waitFor({ timeout: 3000 })
+  await page.locator('text=不支持直接调起打印').first().waitFor({ timeout: 3000 })
   note('导出 PDF 点击有引导反馈（手机环境改走系统「分享→打印→存储为 PDF」）')
   await assertNoHOverflow(page, '③方案页')
   const t3 = await measureHScroll(page, '.report-doc .overflow-x-auto')
