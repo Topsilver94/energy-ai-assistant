@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Copy, Leaf, Timer, TrendingUp, Wallet } from 'lucide-react'
 import DataCard from '../ui/DataCard'
 import SensitivityTable from './SensitivityTable'
+import PlanCompare from './PlanCompare'
 import { PROJECT_TYPES, useProjectStore } from '../../stores/projectStore'
 import { useConfigStore } from '../../stores/configStore'
 import { calculateFeasibility } from '../../utils/finance'
@@ -91,6 +92,9 @@ export default function FeasibilityResults() {
         组合年毛收益 {total.annualRevenue.toFixed(1)} 万元 · 已扣年运维 ·
         修改「专家参数」保存后自动重算
       </p>
+
+      {/* 方案比选 A/B：存两轮测算快照并排对比（内部决策工具，不进报告） */}
+      <PlanCompare />
 
       {/* 分项明细节头：右侧「复制台账快照」= 影子测算 / 回测台账的对账入口
           （TSV 贴 Excel 自动分列；身份行含当次 AS_OF 数据版本，关键参数与报告
