@@ -5,6 +5,8 @@ import ExpertPanel from './components/layout/ExpertPanel'
 import ApiSettingsModal from './components/layout/ApiSettingsModal'
 import ModeSwitch from './components/layout/ModeSwitch'
 import WorkNav from './components/layout/WorkNav'
+import DemoNav from './components/layout/DemoNav'
+import { stepAnchorId } from './components/layout/steps'
 import CalculatorModule from './components/calculator'
 import DiagnosisModule from './components/diagnosis'
 import AIReportPanel from './components/aiReport/AIReportPanel'
@@ -23,6 +25,12 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [mode, setMode] = useState('work')
   const [activeKey, setActiveKey] = useState('diag')
+  // 演示模式聚焦列（点击左缘书签后置位；null = 未跳转过，三列全貌无描边）。
+  // 与 activeKey 分开：演示模式的定位不切页，也不该触发工作模式的「换页滚回顶部」
+  const [demoFocus, setDemoFocus] = useState(null)
+  // 聚焦是纯视觉指示——ring 走 box-shadow，不改变任何盒尺寸（红线：不影响现有布局形式）；
+  // 圆角随描边一起给，只为贴合 Card 的 rounded-lg 边缘
+  const focusRing = (key) => (demoFocus === key ? 'rounded-lg ring-2 ring-volt' : '')
 
   // 工作模式分页清单（key 与 WorkNav STEPS 对齐；wide = 横向双栏布局）。
   // 顺序即售前主线「先诊断后开方」：①诊断（默认入口）→ ②测算 → ③方案；
@@ -69,7 +77,9 @@ export default function App() {
            时补 h-full 跟随列高（底边对齐）。③ 报告是长文档：Card 在 lg 起 absolute
            inset-0 填满列高（wrapper relative 为其定位上下文），脱离行高贡献——
            行高始终由输入侧①② 的自然内容决定，报告在卡内滚动，不再把三列一起
-           拉出长空白；<lg 堆叠与打印 Card 回文档流（print:static）*/
+           拉出长空白；<lg 堆叠与打印 Card 回文档流（print:static）
+           每列 wrapper 挂 stepAnchorId 供左缘书签平滑定位；scroll-mt-20 预留常驻
+           顶栏高度，使列顶落在顶栏下方而非被压住（不占位：scroll-margin 不影响布局）*/
         <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8 print:px-0 print:py-0">
           <section className="no-print mb-6">
             <h2 className="text-2xl font-bold">挖掘痛点 · 锁定收益 · 订制方案，三步闭环</h2>
@@ -80,13 +90,13 @@ export default function App() {
           </section>
 
           <div className="grid gap-6 lg:grid-cols-[repeat(3,minmax(0,1fr))] print:block">
-            <div className="min-w-0">
+            <div id={stepAnchorId('diag')} className={`min-w-0 scroll-mt-20 ${focusRing('diag')}`}>
               <DiagnosisModule wide={false} />
             </div>
-            <div className="min-w-0">
+            <div id={stepAnchorId('calc')} className={`min-w-0 scroll-mt-20 ${focusRing('calc')}`}>
               <CalculatorModule wide={false} />
             </div>
-            <div className="relative min-w-0">
+            <div id={stepAnchorId('report')} className={`relative min-w-0 scroll-mt-20 ${focusRing('report')}`}>
               <AIReportPanel wide={false} />
             </div>
           </div>
@@ -94,6 +104,8 @@ export default function App() {
       )}
 
       {mode === 'work' && <WorkNav active={activeKey} onChange={setActiveKey} />}
+      {/* 演示模式书签：不切页，定位该列顶部 + 高亮聚焦（工作模式书签与它互斥渲染） */}
+      {mode === 'demo' && <DemoNav active={demoFocus} onChange={setDemoFocus} />}
       <StepNav />
       <ModeSwitch mode={mode} onChange={setMode} />
       {/* 应用页脚：开源声明（仓库 LICENSE 同口径）+ 口径提示；报告自身的版权/免责在 ReportDocument 报告尾 */}

@@ -1,7 +1,5 @@
 import { Check } from 'lucide-react'
-import { useProjectStore } from '../../stores/projectStore'
-import { useDiagnosisStore } from '../../stores/diagnosisStore'
-import { useAiStore } from '../../stores/aiStore'
+import { STEPS, useStepDone } from './steps'
 
 /**
  * 工作模式「书签导航」：贴屏幕左缘的三枚书签（隐蔽常驻，不占布局）。
@@ -10,19 +8,10 @@ import { useAiStore } from '../../stores/aiStore'
  * （标题 + 一句说明 + 完成对勾），点击切换分页。
  * 展开为纯 CSS 过渡（宽度 200ms + 文字淡入延迟 100ms），无 JS 状态；
  * 选中书签仅多探出 4px 并亮绿描边——绿色做指示不做铺色（§6 纪律）。
+ * 步骤清单与完成态取自 ./steps（与演示模式书签同一事实源）。
  */
-const STEPS = [
-  { key: 'diag', index: '01', label: '挖掘痛点', hint: '对标基准定位节能空间' },
-  { key: 'calc', index: '02', label: '锁定收益', hint: '组合测算投资与收益' },
-  { key: 'report', index: '03', label: '订制方案', hint: '汇总①②输出一页方案' },
-]
-
 export default function WorkNav({ active, onChange }) {
-  const isFeasibleDone = useProjectStore((s) => s.isFeasibleDone)
-  const isDiagnosisDone = useDiagnosisStore((s) => s.isDiagnosisDone)
-  const isReportDone = useAiStore((s) => s.reportContent.length > 0)
-
-  const doneMap = { calc: isFeasibleDone, diag: isDiagnosisDone, report: isReportDone }
+  const doneMap = useStepDone()
 
   return (
     <nav

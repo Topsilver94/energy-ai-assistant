@@ -7,6 +7,8 @@
 //   ④ 执行摘要数据卡 2×2（演示窄列；sm: 视口断点在窄列会挤成 4 列显示不全）
 //   ⑤ 两处分项明细表（模块② min-w-480 / 报告内 min-w-560）首列 sticky 固定
 //   ⑥ 台账快照：复制按钮 → 剪贴板 TSV（身份行 + 分项表 + 关键参数段）
+//   ⑦ 演示模式左缘定位书签：与工作模式书签互斥渲染、内容左右留白对称（书签不占位）、
+//     落点 = 该列顶部（顶栏下方）、STEP③ 报告内部滚动归零、聚焦描边唯一、不引入横向溢出
 // 依赖 dev server（默认 5173，DEMO_LAYOUT_URL 可覆盖）已启动
 const path = require('path')
 const fs = require('fs')
@@ -177,6 +179,71 @@ const check = (name, ok, detail) => {
 
   await page.screenshot({ path: `${OUT}/demo-layout.png`, fullPage: true })
   console.log(`✓ 截图 ${OUT}/demo-layout.png（整页三列）`)
+
+  // ── ⑦ 演示模式左缘定位书签（定位 + 聚焦 + 报告归零）──
+  const navSel = 'nav[aria-label="模块定位导航"]'
+  const stepCount = await page.locator(`${navSel} button`).count()
+  const workNavCount = await page.locator('nav[aria-label="模块导航"]').count()
+  check('⑦a 演示模式书签与工作模式书签互斥', stepCount === 3 && workNavCount === 0,
+    `定位书签 ${stepCount} 枚 / WorkNav ${workNavCount} 个`)
+
+  // 内容左右留白对称 ⇒ 没有为 fixed 书签加左列占位（红线：不改变现有布局形式）
+  const pad = await page.evaluate(() => {
+    const r = document.querySelector('main > div.grid').getBoundingClientRect()
+    return {
+      left: Math.round(r.left),
+      right: Math.round(document.documentElement.clientWidth - r.right),
+    }
+  })
+  check('⑦b 三列左右留白对称（书签不占位）', Math.abs(pad.left - pad.right) <= 2,
+    `左 ${pad.left}px / 右 ${pad.right}px`)
+
+  // 先把报告内部滚到底：不归零的话，跳过去看到的是上次读到的一半而非报告开头
+  const before3 = await page.evaluate(() => {
+    const el = document.getElementById('report-scroll')
+    el.scrollTop = el.scrollHeight
+    return el.scrollTop
+  })
+  await page.locator(`${navSel} button[aria-label^="03"]`).click()
+  // 等两段平滑滚动（页面定位 + 报告内部归零）都停稳；未到位由下面的断言给出可读结果
+  await page
+    .waitForFunction(
+      () => {
+        const w = document.getElementById('demo-step-report')
+        const landed =
+          Math.abs(w.getBoundingClientRect().top - parseFloat(getComputedStyle(w).scrollMarginTop)) < 3
+        return landed && document.getElementById('report-scroll').scrollTop === 0
+      },
+      { timeout: 6000 },
+    )
+    .catch(() => {})
+  const step3 = await page.evaluate(() => {
+    const w = document.getElementById('demo-step-report')
+    return {
+      gap: Math.round(w.getBoundingClientRect().top),
+      smt: parseFloat(getComputedStyle(w).scrollMarginTop),
+      headerH: Math.round(document.querySelector('header').getBoundingClientRect().height),
+      // 三列 wrapper 的描边（亮绿 ring 走 box-shadow 的 rgb(30, 215, 96)）
+      rings: ['diag', 'calc', 'report'].map(
+        (k) => getComputedStyle(document.getElementById(`demo-step-${k}`)).boxShadow,
+      ),
+      reportScroll: document.getElementById('report-scroll').scrollTop,
+      hOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    }
+  })
+  const VOLT = '30, 215, 96'
+  check('⑦c 落点为该列顶部（scroll-margin 预留顶栏，未被压住）',
+    Math.abs(step3.gap - step3.smt) <= 3 && step3.smt >= step3.headerH,
+    `列顶距视口 ${step3.gap}px（scroll-margin ${step3.smt} / 顶栏 ${step3.headerH}px）`)
+  check('⑦d 跳转 STEP③ 报告内部滚动归零', before3 > 0 && step3.reportScroll === 0,
+    `内部 scrollTop ${before3} → ${step3.reportScroll}`)
+  check('⑦e 仅聚焦列有亮绿描边（高亮唯一）',
+    step3.rings[2].includes(VOLT) && step3.rings[0] === 'none' && step3.rings[1] === 'none',
+    step3.rings.map((s) => (s === 'none' ? '无' : s.includes(VOLT) ? 'volt' : s)).join(' / '))
+  check('⑦f 书签不引入横向溢出', step3.hOverflow <= 1, `溢出 ${step3.hOverflow}px`)
+
+  await page.evaluate(() => window.scrollTo({ top: 0 }))
+  await page.waitForTimeout(200)
 
   // ── <lg 堆叠态：报告区 min-h 兜底不塌陷 ──
   await page.setViewportSize({ width: 900, height: 900 })

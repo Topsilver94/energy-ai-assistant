@@ -18,7 +18,7 @@
 
 **项目双重定位**：自用效率工具 + 简历展示项目。代码可读性、数据可溯源性、演示专业度必须经得起他人（含面试官）审视。
 
-**双界面模式**（右下角 ModeSwitch 切换）：工作模式为默认——左缘书签导航（隐蔽常驻，悬浮滑出完整信息）+ 内容分页居中，适合内部使用；演示模式三列同屏，适合对外展示全貌。模块数据全部在 store，切换模式/分页不丢状态。
+**双界面模式**（右下角 ModeSwitch 切换）：工作模式为默认——左缘书签导航（隐蔽常驻，悬浮滑出完整信息）+ 内容分页居中，适合内部使用；演示模式三列同屏 + 左缘定位书签（与工作模式同一视觉语言，但**不切页**：点击平滑定位到该列顶部并高亮聚焦该列，STEP③ 另将报告卡内部滚动归零），适合对外展示全貌。书签 fixed 贴边不占位、不加左列留白（红线），收起态宽度不超过内容左缘的可让空间，故手机上同屏出现也不遮信息。模块数据全部在 store，切换模式/分页不丢状态。
 
 ## 2. 技术栈
 
@@ -62,7 +62,7 @@ src/
 │   ├── recommendationRules.js # 方案配置推荐规则阈值（带 source）
 │   └── measures.js          # 预设措施库 + 新建建筑一体化建议文案
 ├── components/
-│   ├── layout/              # Header（页头四入口）、ExpertPanel（三抽屉：scope=expert/power/reference）、StepNav、WorkNav（工作模式左缘书签导航）、ModeSwitch（右下角双模式切换）、ApiSettingsModal
+│   ├── layout/              # Header（页头四入口）、ExpertPanel（三抽屉：scope=expert/power/reference）、StepNav、steps.js（三步元数据 + 完成态 + 锚点 id 契约，WorkNav/DemoNav 共用）、WorkNav（工作模式左缘书签导航，切页）、DemoNav（演示模式左缘定位书签，定位 + 聚焦）、ModeSwitch（右下角双模式切换）、ApiSettingsModal
 │   ├── calculator/          # 模块② 组件（含 SensitivityTable 敏感性表）
 │   ├── diagnosis/           # 模块① 组件（含 LoadCurveInput 负荷曲线上传、RecommendationList 推荐列表、ValueHeatmap 热力图）
 │   ├── aiReport/            # 模块③ 组件（流式渲染 + 导出按钮）

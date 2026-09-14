@@ -3,7 +3,8 @@
 //   ② 工作模式三页无全局横向溢出；窄屏渲染 WorkTabs（WorkNav 悬浮书签须隐藏）
 //   ③ 省份索引栏（模块①② 同构）可点开、字母索引条/选项可用
 //   ④ 本地模板生成后「导出 PDF」在手机环境给出引导反馈（不再「点了没反应」）
-//   外加：演示模式（≥1024 三列 / 窄屏单列）内容不超出右缘、三列等宽。
+//   外加：演示模式（≥1024 三列 / 窄屏单列）内容不超出右缘、三列等宽、
+// 左缘定位书签收起态落在左留白内不遮信息、点击后落到该列顶部（顶栏不压住）。
 // 依赖：dev server 运行中（默认 :5175，可 BASE_URL 覆盖）；本地模板降级，无需 API Key。
 const { chromium } = require('playwright')
 const fs = require('fs')
@@ -32,6 +33,31 @@ const assertNoHOverflow = async (page, label) => {
   const overflow = m.scrollW - m.innerW
   if (overflow > 1) fail(`${label}：全局横向溢出 ${overflow}px（内容 ${m.scrollW} / 视口 ${m.innerW}）`)
   else note(`${label}：无横向溢出（${m.scrollW}/${m.innerW}）`)
+  return m
+}
+
+// 断言：演示模式左缘书签不遮信息——收起态宽度 ≤ 内容左缘的可让空间即零重叠
+// （fixed 贴边不占位，故判据是「书签右缘 ≤ 网格左缘」，与具体像素无关）
+const assertNavClear = async (page, label) => {
+  const m = await page.evaluate(() => {
+    const btns = document.querySelectorAll('nav[aria-label="模块定位导航"] button')
+    const grid = document.querySelector('main > div.grid')
+    if (!btns.length || !grid) return null
+    const b = btns[0].getBoundingClientRect()
+    return {
+      n: btns.length,
+      w: Math.round(b.width),
+      right: Math.round(b.right),
+      contentLeft: Math.round(grid.getBoundingClientRect().left),
+      innerW: window.innerWidth,
+    }
+  })
+  if (!m) fail(`${label}：未渲染定位书签`)
+  else if (m.n !== 3) fail(`${label}：定位书签应为 3 枚（实际 ${m.n}）`)
+  else if (m.w > m.contentLeft + 1 || m.right > m.contentLeft + 1)
+    fail(`${label}：书签压住内容（收起 ${m.w}px / 右缘 ${m.right}px > 内容左缘 ${m.contentLeft}px）`)
+  else if (m.right > m.innerW + 1) fail(`${label}：书签越出视口右缘`)
+  else note(`${label}：书签 ${m.n} 枚收起 ${m.w}px，落在 ${m.contentLeft}px 左留白内（不遮信息）`)
   return m
 }
 
@@ -159,11 +185,46 @@ const measureHScroll = (page, sel) =>
   else fail('STEP3 分项明细未形成「卡片内横滑」容器（右列可能仍被裁）')
   await page.screenshot({ path: path.join(shotDir, 'mobile-3-report.png'), fullPage: true })
 
-  // ── 演示模式：窄屏单列无横溢 ──
+  // ── 演示模式：窄屏单列无横溢 + 左缘书签不遮信息 ──
   await demoBtn.click()
   await page.waitForTimeout(300)
   await assertNoHOverflow(page, '演示模式（390 单列）')
+  await assertNavClear(page, '演示模式（390 单列）')
+
+  // 点 STEP③ → 平滑定位到该列顶部（scroll-margin 预留顶栏，列顶不被压住）
+  await page.locator('nav[aria-label="模块定位导航"] button[aria-label^="03"]').click()
+  await page
+    .waitForFunction(
+      () => {
+        const w = document.getElementById('demo-step-report')
+        return (
+          Math.abs(w.getBoundingClientRect().top - parseFloat(getComputedStyle(w).scrollMarginTop)) < 3
+        )
+      },
+      { timeout: 10000 },
+    )
+    .catch(() => {})
+  const land = await page.evaluate(() => {
+    const w = document.getElementById('demo-step-report')
+    return {
+      gap: Math.round(w.getBoundingClientRect().top),
+      smt: parseFloat(getComputedStyle(w).scrollMarginTop),
+      headerH: Math.round(document.querySelector('header').getBoundingClientRect().height),
+      scrollTop: document.getElementById('report-scroll').scrollTop,
+      overflow: document.documentElement.scrollWidth - window.innerWidth,
+    }
+  })
+  if (Math.abs(land.gap - land.smt) > 4 || land.smt < land.headerH)
+    fail(`演示书签未落到列顶（列顶 ${land.gap}px / scroll-margin ${land.smt} / 顶栏 ${land.headerH}px）`)
+  else
+    note(
+      `跳转 STEP③ 落到列顶 ${land.gap}px = scroll-margin ${land.smt}px（顶栏 ${land.headerH}px 未压住）` +
+        `，报告内部滚动 ${land.scrollTop}px`,
+    )
+  if (land.overflow > 1) fail(`书签跳转后横向溢出 ${land.overflow}px`)
   await page.screenshot({ path: path.join(shotDir, 'mobile-4-demo.png'), fullPage: true })
+  await page.evaluate(() => window.scrollTo({ top: 0 }))
+  await page.waitForTimeout(200)
 
   // ── 演示模式：拉宽到 ≥1024 三列等宽、第三列不越右缘（store 数据随模式切换保留） ──
   await page.setViewportSize({ width: 1280, height: 800 })
@@ -195,6 +256,7 @@ const measureHScroll = (page, sel) =>
     if (gridOverflow > 1) fail(`演示网格横向溢出 ${gridOverflow}px`)
     else note(`演示网格无横向溢出（${cols.scrollW}/${cols.innerW}）`)
   }
+  await assertNavClear(page, '演示模式（1280 三列）')
   await page.screenshot({ path: path.join(shotDir, 'mobile-5-demo-3col.png'), fullPage: true })
 
   await browser.close()

@@ -16,6 +16,8 @@ import Card from '../ui/Card'
 import StatusBadge from '../ui/StatusBadge'
 import Button from '../ui/Button'
 import ReportDocument from './ReportDocument'
+// 演示模式书签跳到 STEP③ 时要归零本卡的滚动容器，锚点 id 由导航契约文件统一声明
+import { REPORT_SCROLL_ID } from '../layout/steps'
 import { useProjectStore } from '../../stores/projectStore'
 import { useDiagnosisStore } from '../../stores/diagnosisStore'
 import { useAiStore } from '../../stores/aiStore'
@@ -294,6 +296,7 @@ export default function AIReportPanel({ wide = false }) {
               滚动；min-h 兜底 <lg 堆叠态（Card 回文档流，无拉伸时 flex 基准为 0 会塌陷） */}
           <div
             ref={scrollRef}
+            id={REPORT_SCROLL_ID}
             className={`mt-4 flex-1 overflow-y-auto print:mt-0 print:min-h-0 print:max-h-none print:overflow-visible ${
               wide ? 'max-h-[600px]' : 'min-h-[420px] lg:min-h-0'
             }`}
