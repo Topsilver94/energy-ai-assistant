@@ -176,7 +176,7 @@ export default function AIReportPanel({ wide = false }) {
   return (
     <Card
       className={`flex flex-col p-6 print:p-0 print:border-none print:bg-transparent ${
-        wide ? '' : 'h-full'
+        wide ? '' : 'h-full lg:absolute lg:inset-0 print:static'
       }`}
     >
       <div className="no-print flex items-start justify-between gap-3">
@@ -289,16 +289,16 @@ export default function AIReportPanel({ wide = false }) {
           )}
 
           {/* 报告版式容器：报告头/执行摘要/数据表/报告尾确定性渲染，AI 正文只进正文槽。
-              wide 用 max-h 限高；演示模式（窄）去掉上限、flex-1 吃满三列等高拉伸出的
-              剩余高度（可视区随中列测算结果变高而变高），min-h 兜底 <lg 堆叠态（无等高
-              拉伸时 flex 基准为 0 会塌陷） */}
+              wide 用 max-h 限高；演示模式（窄）Card 在 lg 起绝对定位填满三列栅格的行高
+              （行高由输入侧①② 决定，报告不撑高整行），flex-1 吃满卡内剩余高度、内部
+              滚动；min-h 兜底 <lg 堆叠态（Card 回文档流，无拉伸时 flex 基准为 0 会塌陷） */}
           <div
             ref={scrollRef}
             className={`mt-4 flex-1 overflow-y-auto print:mt-0 print:min-h-0 print:max-h-none print:overflow-visible ${
-              wide ? 'max-h-[600px]' : 'min-h-[420px]'
+              wide ? 'max-h-[600px]' : 'min-h-[420px] lg:min-h-0'
             }`}
           >
-            <ReportDocument>
+            <ReportDocument wide={wide}>
               {reportContent ? (
                 <Markdown remarkPlugins={[remarkGfm]}>{reportContent}</Markdown>
               ) : (

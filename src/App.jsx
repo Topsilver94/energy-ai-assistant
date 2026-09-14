@@ -65,9 +65,11 @@ export default function App() {
           </div>
         </main>
       ) : (
-        /* 演示模式：三列同屏全貌。grid 默认拉伸使三列等高，各模块 Card 在
-           wide=false 时补 h-full 跟随列高（测算后底边对齐、不再参差），
-           STEP3 报告渲染区 flex-1 吃满多出的高度 */
+        /* 演示模式：三列同屏全貌。grid 默认拉伸使三列等高，①② Card 在 wide=false
+           时补 h-full 跟随列高（底边对齐）。③ 报告是长文档：Card 在 lg 起 absolute
+           inset-0 填满列高（wrapper relative 为其定位上下文），脱离行高贡献——
+           行高始终由输入侧①② 的自然内容决定，报告在卡内滚动，不再把三列一起
+           拉出长空白；<lg 堆叠与打印 Card 回文档流（print:static）*/
         <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8 print:px-0 print:py-0">
           <section className="no-print mb-6">
             <h2 className="text-2xl font-bold">挖掘痛点 · 锁定收益 · 订制方案，三步闭环</h2>
@@ -84,7 +86,7 @@ export default function App() {
             <div className="min-w-0">
               <CalculatorModule wide={false} />
             </div>
-            <div className="min-w-0">
+            <div className="relative min-w-0">
               <AIReportPanel wide={false} />
             </div>
           </div>

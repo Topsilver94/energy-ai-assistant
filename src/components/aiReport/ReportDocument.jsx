@@ -22,7 +22,7 @@ const fmt = (n, digits = 1) => Number(n).toFixed(digits)
  *
  * LOGO 与 API Key 同纪律：仅存 aiStore 内存态（dataURL），刷新即清空，不持久化。
  */
-export default function ReportDocument({ children }) {
+export default function ReportDocument({ wide = true, children }) {
   const pInputs = useProjectStore((s) => s.inputs)
   const feasibility = useProjectStore((s) => s.feasibility)
   const di = useDiagnosisStore((s) => s.inputs)
@@ -114,9 +114,12 @@ export default function ReportDocument({ children }) {
         </div>
       </div>
 
-      {/* 执行摘要：数据卡 + 分项明细 + 敏感性结论（全部确定性渲染，AI 不经手） */}
+      {/* 执行摘要：数据卡 + 分项明细 + 敏感性结论（全部确定性渲染，AI 不经手）。
+          卡片栅格按容器走：wide（工作模式满宽）sm 起 4 列；演示模式三列窄容器固定
+          2×2——sm: 断点量的是视口宽，1440px 视口下右列仅 ~350px，4 列会把
+          数字/标签挤到显示不全，不能依赖视口断点 */}
       <p className="mt-4 text-[11px] uppercase tracking-widest text-paper-mute">执行摘要</p>
-      <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className={`mt-2 grid grid-cols-2 gap-3 ${wide ? 'sm:grid-cols-4' : ''}`}>
         {[
           { label: '投资估算 · 万元', value: fmt(f.totalInvestment, 2) },
           { label: 'IRR · %', value: irrText, accent: true },

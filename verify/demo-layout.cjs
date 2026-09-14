@@ -1,7 +1,10 @@
 // 演示模式三列布局守护：测算完成后切演示模式，断言
 //   ① 三张 Card 底边对齐（三列等高，±1px）
-//   ② 敏感性表窄列横滑（容器可滚）且单元格不折行（数据行高 ≤ 80px）
-//   ③ STEP3 报告渲染区高度 ≥ min-h 兜底，<lg 堆叠态不塌陷（≥ 400px）
+//   ② 敏感性表窄列横滑（容器可滚）、三行制单元格不折行暴涨（数据行高 ≤ 96px）、
+//     变量列 sticky 生效（横滑后首列仍贴容器左缘）
+//   ③ STEP3 报告渲染区吃满等高列且内部滚动（scrollHeight > clientHeight，
+//     证明报告被行高约束而非撑高整行），<lg 堆叠态不塌陷（≥ 400px）
+//   ④ 执行摘要数据卡 2×2（演示窄列；sm: 视口断点在窄列会挤成 4 列显示不全）
 // 依赖 dev server（默认 5173，DEMO_LAYOUT_URL 可覆盖）已启动
 const path = require('path')
 const fs = require('fs')
@@ -62,31 +65,68 @@ const check = (name, ok, detail) => {
     )
     const rects = cards.map((c) => c.getBoundingClientRect())
     // 敏感性表容器（overflow-x-auto + 内部 min-w 网格）与数据行
-    const sens = document.querySelector('.grid.min-w-\\[560px\\]')?.parentElement
+    const sens = document.querySelector('.grid.min-w-\\[420px\\]')?.parentElement
     const sensRows = sens ? [...sens.querySelectorAll(':scope > .grid')] : []
     const rowH = (el) => Math.round(el.getBoundingClientRect().height)
-    // STEP3 报告渲染区（.report-doc 的滚动外层）
+    // 变量列 sticky：横滑到最右后，表头行与首个数据行的首列仍贴容器左缘（容许 1px 边框）
+    let sticky = null
+    if (sens) {
+      sens.scrollLeft = 9999
+      const firstCells = sensRows.slice(0, 2).map((r) => r.firstElementChild)
+      const sr = sens.getBoundingClientRect()
+      sticky = {
+        pos: firstCells.map((c) => getComputedStyle(c).position),
+        offsets: firstCells.map((c) =>
+          Math.round(c.getBoundingClientRect().left - sr.left),
+        ),
+      }
+      sens.scrollLeft = 0
+    }
+    // STEP3 报告渲染区（.report-doc 的滚动外层）；内部溢出 = 报告被行高约束
     const report = document.querySelector('.report-doc')?.parentElement
+    // 执行摘要数据卡（report-doc 直接子级 grid 内）：演示窄列应为 2×2（前两卡同排）
+    const kpi = [...document.querySelectorAll('.report-doc > div.grid > div')].slice(0, 4)
+    const kpiTops = kpi.map((c) => Math.round(c.getBoundingClientRect().top))
     return {
       cardBottoms: rects.map((r) => Math.round(r.bottom)),
       cardHeights: rects.map((r) => Math.round(r.height)),
       sensScrollable: sens ? sens.scrollWidth > sens.clientWidth : null,
       sensRowHeights: sensRows.map(rowH),
+      sticky,
       reportH: report ? Math.round(report.getBoundingClientRect().height) : null,
+      reportConfined: report ? report.scrollHeight / report.clientHeight : null,
+      kpiTops,
     }
   })
   console.log('三列 Card 底边:', demo.cardBottoms.join(' / '), '高度:', demo.cardHeights.join(' / '))
-  console.log('敏感性行高:', demo.sensRowHeights.join(' / '), '| 报告区高:', demo.reportH)
+  console.log(
+    '敏感性行高:', demo.sensRowHeights.join(' / '),
+    '| sticky:', JSON.stringify(demo.sticky),
+  )
+  console.log(
+    '报告区高:', demo.reportH, '| 内容/可视:', demo.reportConfined?.toFixed(2),
+    '| 摘要卡 top:', demo.kpiTops.join(' / '),
+  )
 
   const spread = Math.max(...demo.cardBottoms) - Math.min(...demo.cardBottoms)
   check('① 三列 Card 底边对齐', spread <= 1, `差 ${spread}px`)
   check('②a 敏感性表窄列可横滑', demo.sensScrollable === true,
     `${demo.sensScrollable ? 'scrollWidth>clientWidth' : '未溢出'}`)
   const maxRow = Math.max(...demo.sensRowHeights)
-  check('②b 敏感性数据行未折行暴涨', demo.sensRowHeights.length > 0 && maxRow <= 80,
-    `最高行 ${maxRow}px`)
-  check('③ 报告区吃满等高列', demo.reportH != null && demo.reportH > 520,
+  check('②b 敏感性数据行未折行暴涨', demo.sensRowHeights.length > 0 && maxRow <= 96,
+    `最高行 ${maxRow}px（三行制）`)
+  const st = demo.sticky
+  check('②c 变量列 sticky 固定', st != null && st.pos.every((p) => p === 'sticky')
+    && st.offsets.every((o) => Math.abs(o - 1) <= 1),
+    `position=${st?.pos.join('/')} 左缘偏移=${st?.offsets.join('/')}px`)
+  check('③a 报告区吃满等高列', demo.reportH != null && demo.reportH > 520,
     `${demo.reportH}px（旧上限 520）`)
+  check('③b 报告被行高约束（内部滚动不撑高整行）', demo.reportConfined != null
+    && demo.reportConfined > 1.2, `内容/可视 = ${demo.reportConfined?.toFixed(2)}`)
+  check('④ 执行摘要卡 2×2', demo.kpiTops.length === 4
+    && Math.abs(demo.kpiTops[0] - demo.kpiTops[1]) <= 1
+    && demo.kpiTops[2] > demo.kpiTops[0] + 10,
+    `top = ${demo.kpiTops.join(' / ')}`)
 
   await page.screenshot({ path: `${OUT}/demo-layout.png`, fullPage: true })
   console.log(`✓ 截图 ${OUT}/demo-layout.png（整页三列）`)

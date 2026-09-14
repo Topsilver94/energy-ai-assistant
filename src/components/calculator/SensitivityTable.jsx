@@ -1,10 +1,15 @@
 // 敏感性表（模块② 结果区）：数据全部来自 utils/sensitivity.js，纯展示、无 store
-// 依赖（可独立 SSR 冒烟）。单元格两行制：主行 IRR，副行 回收期 + 相对基准偏差；
-// 偏差优 = volt / 劣 = amber（§6 唯一警示色），跌破折现率的 IRR 数值转 amber。
+// 依赖（可独立 SSR 冒烟）。单元格三行制：主行 IRR，副行两行 = 相对基准偏差（±pp）
+// + 回收期，所有单元格统一三行保证 IRR 基线对齐；偏差优 = volt / 劣 = amber
+// （§6 唯一警示色），回收期一律中性灰；跌破折现率的 IRR 数值转 amber。
 const HEADERS = ['-20%', '-10%', '基准', '+10%', '+20%']
-// min-w 560：保证副行「+x.xpp · y.y 年」一行放下不折行；窄容器（演示模式三列）
-// 由外层 overflow-x-auto 横滑收纳，不再因单元格折行把行高与整列高度撑爆
-const GRID = 'grid min-w-[560px] grid-cols-[88px_repeat(5,minmax(0,1fr))]'
+// min-w 420：副行拆两行后每列只需容纳「+x.xpp / y.y 年」；窄容器（演示模式三列）
+// 由外层 overflow-x-auto 横滑收纳，滑动距离比 560 版减约三分之一；再窄会触发
+// 中文副行（现金流≤0）折行、行高失控
+const GRID = 'grid min-w-[420px] grid-cols-[88px_repeat(5,minmax(0,1fr))]'
+// 变量列（首列）sticky：横滑时固定容器左缘、仅右侧 5 档数据滑动；底色取卡面
+// ink-panel 不透明遮住滑过的单元格，右缘细分隔线区分固定区与滑动区
+const STICKY = 'sticky left-0 z-10 border-r border-line bg-ink-panel'
 
 const paybackText = (p) =>
   p.paybackPeriod === 'N/A' || p.irr == null ? '—' : `${p.paybackPeriod.toFixed(1)} 年`
@@ -39,7 +44,9 @@ export default function SensitivityTable({ sensitivity }) {
       <div className="overflow-x-auto rounded-lg border border-line">
         {/* 表头 */}
         <div className={`${GRID} border-b border-line bg-ink-panel`}>
-          <div className="px-2.5 py-2 text-[11px] uppercase tracking-widest text-paper-mute">
+          <div
+            className={`${STICKY} px-2.5 py-2 text-[11px] uppercase tracking-widest text-paper-mute`}
+          >
             变量
           </div>
           {HEADERS.map((h, i) => (
@@ -57,7 +64,7 @@ export default function SensitivityTable({ sensitivity }) {
         {/* 数据行 */}
         {rows.map((row) => (
           <div key={row.key} className={`${GRID} border-b border-line/40 last:border-0`}>
-            <div className="px-2.5 py-2.5">
+            <div className={`${STICKY} px-2.5 py-2.5`}>
               <p className="text-[13px] font-semibold text-paper">{row.label}</p>
               <p className="text-[10px] leading-tight text-paper-mute">{row.note}</p>
             </div>
@@ -80,6 +87,7 @@ export default function SensitivityTable({ sensitivity }) {
                   >
                     {dead ? '—' : `${(p.irr * 100).toFixed(1)}%`}
                   </span>
+                  {/* 副行两行制：±pp 偏差着色（优 volt / 劣 amber），回收期中性灰 */}
                   <span
                     className={`tabular font-mono text-[10px] ${
                       dead
@@ -94,8 +102,11 @@ export default function SensitivityTable({ sensitivity }) {
                     {dead
                       ? '现金流≤0'
                       : isBase
-                        ? paybackText(p)
-                        : `${delta > 0 ? '+' : ''}${delta.toFixed(1)}pp · ${paybackText(p)}`}
+                        ? '基准'
+                        : `${delta > 0 ? '+' : ''}${delta.toFixed(1)}pp`}
+                  </span>
+                  <span className="tabular font-mono text-[10px] text-paper-mute">
+                    {paybackText(p)}
                   </span>
                 </div>
               )
