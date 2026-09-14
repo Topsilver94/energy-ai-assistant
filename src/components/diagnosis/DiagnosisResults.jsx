@@ -41,6 +41,7 @@ export default function DiagnosisResults({ recs, onApply }) {
         area: Number(inputs.area),
         province: inputs.province,
         roofType: inputs.roofType,
+        roofArea: inputs.roofArea,
         transformerKva: inputs.transformerKva,
         parkingSpots: inputs.parkingSpots,
       })
@@ -131,6 +132,37 @@ export default function DiagnosisResults({ recs, onApply }) {
           <p className="mt-1.5 text-[12px] leading-relaxed text-paper-mute">
             潜力为典型值推演（非实测对标），补电费单回填后自动转实测口径。
           </p>
+        </div>
+      )}
+
+      {/* 曲线实测口径：年电量/需量/负荷率来源与质量注记透明呈现（最优先口径） */}
+      {!isNew && diagnosis.curve && (
+        <div className="rounded-lg border border-volt/30 bg-ink-raised px-3.5 py-2.5">
+          <p className="text-[11px] uppercase tracking-widest text-paper-mute">
+            能耗口径 · 曲线实测{diagnosis.curve.fileName ? `（${diagnosis.curve.fileName}）` : ''}
+          </p>
+          <ul className="mt-1.5 space-y-1">
+            <li className="text-[12px] leading-relaxed text-paper-mute">
+              年用电量 = 平均功率 {diagnosis.curve.avgKw.toLocaleString()} kW × 8760h → 约{' '}
+              <span className="tabular font-mono text-paper">
+                {Math.round(diagnosis.curve.annualKwh / 1e4).toLocaleString()}
+              </span>{' '}
+              万 kWh（电费反推口径已让位）
+            </li>
+            <li className="text-[12px] leading-relaxed text-paper-mute">
+              最大需量{' '}
+              <span className="tabular font-mono text-paper">
+                {diagnosis.curve.maxKw.toLocaleString()} kW
+              </span>{' '}
+              · 负荷率 {(diagnosis.curve.loadFactor * 100).toFixed(0)}% ·{' '}
+              {diagnosis.curve.intervalMin} 分钟粒度（储能定容与需量收益按此实测口径）
+            </li>
+            {diagnosis.curve.notes?.map((n) => (
+              <li key={n} className="text-[12px] leading-relaxed text-paper-mute">
+                注：{n}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

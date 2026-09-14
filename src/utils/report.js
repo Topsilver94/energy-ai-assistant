@@ -115,7 +115,7 @@ export const buildReportDraft = (project, diagnosis, config) => {
   const storageScopeText = storageItem
     ? `储能套利按代理购电固定分时口径测算（已计效率/放电深度/年可用天数与充电损耗工程修正），市场化交易用户需按现货价差重估（行业情景中枢约下移 30%）；` +
       (storageItem.demandDetail && !storageItem.demandDetail.skipped
-        ? `需量管理收益已按推定需量基数计入（削峰 ${Math.round(storageItem.demandDetail.shavedKw)} kW）。`
+        ? `需量管理收益已按${storageItem.demandDetail.measured ? '实测（负荷曲线口径）' : '推定'}需量基数计入（削峰 ${Math.round(storageItem.demandDetail.shavedKw)} kW）。`
         : storageItem.demandDetail?.skipped
           ? '需量管理收益未计入（推定容量低于两部制门槛）。'
           : '需量管理与现货/需求响应/辅助服务收益未计入确定性测算，属后续深化潜力。')
@@ -131,7 +131,7 @@ export const buildReportDraft = (project, diagnosis, config) => {
         ? d.designChecked
           ? `设计强度 ${fmt(d.actualIntensity)} kWh/㎡·a vs 约束值 ${d.benchmarkIntensity} kWh/㎡·a，${d.checkResult}`
           : `按约束值 ${d.benchmarkIntensity} kWh/㎡·a 预估年用电量 ${fmt(d.annualConsumption / 1e4)} 万 kWh`
-        : `实际能耗强度 ${fmt(d.actualIntensity)} kWh/㎡·a，对标基准 ${d.benchmarkIntensity ?? '—'} kWh/㎡·a，能效评级「${d.rating ?? '—'}」${d.estimate ? '（电费未知，按预估口径推演，补电费单后转实测对标）' : ''}`
+        : `实际能耗强度 ${fmt(d.actualIntensity)} kWh/㎡·a，对标基准 ${d.benchmarkIntensity ?? '—'} kWh/㎡·a，能效评级「${d.rating ?? '—'}」${d.estimate ? '（电费未知，按预估口径推演，补电费单后转实测对标）' : d.curve ? `（负荷曲线实测口径：最大需量 ${Math.round(d.curve.maxKw)} kW · 负荷率 ${Math.round(d.curve.loadFactor * 100)}%）` : ''}`
     }\n\n` +
     '## 二、财务分析\n\n' +
     `组合投资估算 ${fmt(f.totalInvestment, 2)} 万元，年毛收益 ${fmt(f.annualRevenue)} 万元/年，IRR ${fmt((f.irr ?? 0) * 100)} %，静态回收期 ${payback}（按合并现金流测算，共同计算期取各系统寿命最大值）；年碳减排 ${fmt(f.carbonReduction)} tCO₂。${storageScopeText}分项明细与敏感性结论见执行摘要数据表。\n\n` +

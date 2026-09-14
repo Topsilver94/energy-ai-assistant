@@ -154,8 +154,12 @@ const check = (name, ok, detail) => {
     `position=${st?.pos.join('/')} 左缘偏移=${st?.offsets.join('/')}px`)
   check('③a 报告区吃满等高列', demo.reportH != null && demo.reportH > 520,
     `${demo.reportH}px（旧上限 520）`)
+  // 判据是结构性的：报告内容超出可视区（scrollHeight > clientHeight）即证明它是被行高约束的
+  // 消费方，而非把整行撑高的驱动方——若报告参与决定行高，比值必为 1.0。
+  // 比值本身随 ①/② 列高浮动（列越高 → 报告可视区越大 → 比值越接近 1），故不预设固定档，
+  // 只留 1.05 的余量避免浮点抖动误判；「报告确实吃满等高列」由 ③a 与 ① 底边对齐另作兜底。
   check('③b 报告被行高约束（内部滚动不撑高整行）', demo.reportConfined != null
-    && demo.reportConfined > 1.2, `内容/可视 = ${demo.reportConfined?.toFixed(2)}`)
+    && demo.reportConfined > 1.05, `内容/可视 = ${demo.reportConfined?.toFixed(2)}（>1 即证明被约束）`)
   check('④ 执行摘要卡 2×2', demo.kpiTops.length === 4
     && Math.abs(demo.kpiTops[0] - demo.kpiTops[1]) <= 1
     && demo.kpiTops[2] > demo.kpiTops[0] + 10,

@@ -116,6 +116,7 @@ export const buildRecommendations = (
     annualConsumption: rawAnnualConsumption,
     transformerKva: rawTransformerKva,
     parkingSpots: rawParkingSpots,
+    curve: rawCurve,
   },
   config,
 ) => {
@@ -195,17 +196,32 @@ export const buildRecommendations = (
       ? `实填 ${kva.toLocaleString()} kVA`
       : `按${buildingType} ${vaPerSqm} VA/㎡ 推定约 ${kva.toLocaleString()} kVA`
 
-  // 需量基数推定（模块② 需量收益与报告注记用，双口径取短板）：
-  //   负荷率法 = 年电量 ÷ 8760 ÷ 分类型负荷率（平均负荷÷最大需量）
-  //   变压器法 = kVA × 功率因数 × 峰值负载率（= 既有平均负载率 ÷ 负荷率，复用既有系数不另立表）
+  // 需量基数推定（模块② 需量收益与报告注记用）：
+  //   曲线实测口径（最优先）：最大需量 = 曲线最大值（15 分钟粒度即两部制需量电表口径，
+  //     其余粒度在曲线质量注记中已声明偏差方向），负荷率为实测值
+  //   无曲线双口径取短板：负荷率法 = 年电量 ÷ 8760 ÷ 分类型负荷率（平均负荷÷最大需量）；
+  //     变压器法 = kVA × 功率因数 × 峰值负载率（= 既有平均负载率 ÷ 负荷率，复用既有系数）
   const LE = config.loadEstimate
   const LF = SS.demandLoadFactor?.[buildingType] ?? 0.45
   const annualKwhValid = Number.isFinite(annualKwh) && annualKwh > 0 ? annualKwh : 0
-  const demandByLoad = annualKwhValid > 0 ? Math.round(annualKwhValid / 8760 / LF) : null
   const avgLF = LE.transformerLoadFactor[buildingType] ?? 0.3
+  const curve =
+    rawCurve && Number(rawCurve.maxKw) > 0
+      ? { maxKw: Number(rawCurve.maxKw), loadFactor: Number(rawCurve.loadFactor) }
+      : null
+  const demandByLoad = annualKwhValid > 0 ? Math.round(annualKwhValid / 8760 / LF) : null
   const demandByTrafo = Math.round(kva * LE.transformerPowerFactor * Math.min(0.95, avgLF / LF))
-  const demandBaseKw = Math.round(Math.min(demandByLoad ?? Infinity, demandByTrafo))
-  const demand = { baseKw: demandBaseKw, kva, annualKwh: annualKwhValid }
+  const demandBaseKw = curve
+    ? Math.round(curve.maxKw)
+    : Math.round(Math.min(demandByLoad ?? Infinity, demandByTrafo))
+  // measured / intervalMin 随快照一起下传（模块② → finance.demandDetail → 报告文案与 AI 提示词）：
+  // 口径标记跟着数字走，不依赖渲染时回读全局状态——否则「先填②后传曲线」会把推定值写成实测值。
+  const demand = {
+    baseKw: demandBaseKw,
+    kva,
+    annualKwh: annualKwhValid,
+    ...(curve ? { measured: true, intervalMin: rawCurve.intervalMin } : {}),
+  }
 
   let storageKwh
   let sizingReasons
@@ -225,7 +241,9 @@ export const buildRecommendations = (
     sizingReasons = [
       `负荷口径：日均用电 ${Math.round(dailyKwh).toLocaleString()} kWh × 峰段可转移系数 ${SS.peakShiftRatio} → 上限约 ${eLoad.toLocaleString()} kWh`,
       `变压器口径：${kvaNote} × ${Math.round(SS.transformerPowerRatio * 100)}% × ${SS.hours}h → 上限约 ${eTrafo.toLocaleString()} kWh`,
-      `按短板定容约 ${storageKwh.toLocaleString()} kWh（${SS.hours}h 系统），需负荷曲线与实际报装容量复核`,
+      curve
+        ? `按短板定容约 ${storageKwh.toLocaleString()} kWh（${SS.hours}h 系统），年电量与需量已按实测曲线口径，建议再按实际报装容量复核`
+        : `按短板定容约 ${storageKwh.toLocaleString()} kWh（${SS.hours}h 系统），需负荷曲线与实际报装容量复核`,
     ]
   }
   const storageScore = clamp(
@@ -325,7 +343,9 @@ export const buildRecommendations = (
         ...(STEADY_LOAD_TYPES.includes(buildingType)
           ? [`${buildingType}全天负荷平稳，储能利用率高`]
           : []),
-        `需量基数推定：${demandByLoad ? `负荷率法约 ${demandByLoad.toLocaleString()} kW 与 ` : ''}变压器法约 ${demandByTrafo.toLocaleString()} kW 取短板 → 最大需量约 ${demandBaseKw.toLocaleString()} kW；两部制按需量计费用户（推定容量 ≥315 kVA）模块② 将计入需量削峰收益`,
+        curve
+          ? `需量基数实测：负荷曲线最大 ${demandBaseKw.toLocaleString()} kW（${rawCurve.intervalMin} 分钟口径）· 实测负荷率 ${(curve.loadFactor * 100).toFixed(0)}%；两部制按需量计费用户（推定容量 ≥315 kVA）模块② 将计入需量削峰收益`
+          : `需量基数推定：${demandByLoad ? `负荷率法约 ${demandByLoad.toLocaleString()} kW 与 ` : ''}变压器法约 ${demandByTrafo.toLocaleString()} kW 取短板 → 最大需量约 ${demandBaseKw.toLocaleString()} kW；两部制按需量计费用户（推定容量 ≥315 kVA）模块② 将计入需量削峰收益`,
         ...sizingReasons,
       ],
       estimate: estimateOf('storage', storageKwh, province, config, demand),

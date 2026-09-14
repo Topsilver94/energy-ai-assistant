@@ -54,7 +54,8 @@ const calcIrr = (investment, flows) => {
  * 统一产出：capex / gross（投资与年毛收益，万元）/ energyKwh（碳减排口径电量，kWh）
  * + 对应系数组的运维比例与计算期，可选 fixedOm（固定年成本，万元，如场地租金）。
  * gross 已是「扣直接能源成本后」的毛收益。
- * demand（可选）：模块① 推定的需量上下文 { baseKw, kva, annualKwh }，仅储能消费。
+ * demand（可选）：模块① 的需量上下文 { baseKw, kva, annualKwh, measured?, intervalMin? }，仅储能消费。
+ *   measured=true 表示 baseKw 来自负荷曲线实测最大需量（而非双口径推定）——报告文案据此标注口径。
  */
 const perType = (projectType, scale, province, config, demand) => {
   const prov = config.provinces[province] ?? Object.values(config.provinces)[0]
@@ -112,7 +113,17 @@ const perType = (projectType, scale, province, config, demand) => {
           (storage.demandPricePerKwMonth ?? 0) *
           (monthlyPerKva >= DEMAND_INCENTIVE_KWH_PER_KVA ? DEMAND_INCENTIVE_DISCOUNT : 1)
         demandSaving = (shavedKw * price * 12) / 1e4
-        demandDetail = { baseKw: demand.baseKw, kva: demand.kva, shavedKw, monthlyPerKva, price, saving: demandSaving }
+        demandDetail = {
+          baseKw: demand.baseKw,
+          kva: demand.kva,
+          shavedKw,
+          monthlyPerKva,
+          price,
+          saving: demandSaving,
+          // 口径溯源随分项下传：模块③ 报告与 AI 提示词据此区分实测/推定需量
+          measured: demand.measured === true,
+          intervalMin: demand.intervalMin ?? null,
+        }
       }
     }
     return {

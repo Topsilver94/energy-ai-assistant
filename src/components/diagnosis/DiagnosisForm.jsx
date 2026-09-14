@@ -1,6 +1,7 @@
 import { Activity, Loader2 } from 'lucide-react'
 import Button from '../ui/Button'
 import ProvincePicker from '../ui/ProvincePicker'
+import LoadCurveInput from './LoadCurveInput'
 import { useDiagnosisStore } from '../../stores/diagnosisStore'
 import { benchmarkTypes } from '../../data/benchmarks.js'
 import { recommendationRules } from '../../data/recommendationRules.js'
@@ -18,7 +19,8 @@ const inputClass =
 
 /**
  * 模块① 输入表单：建筑性质（既有/新建）+ 面积 / 类型 / 省份
- * 既有另填：建造年份（滑杆）+ 年度电费；新建另填：设计能耗强度（可选，留空按约束值预估）
+ * 既有另填：建造年份（滑杆）+ 年度电费（可选填负荷曲线，上传后电费口径让位）；
+ * 新建另填：设计能耗强度（可选，留空按约束值预估）
  * 两种性质共用选填：屋面面积（图纸投影，实填后光伏规模走单项折减链）/ 车位数量
  * 省份用于读取分省电价（与模块②同一 config 数据源）
  */
@@ -231,6 +233,9 @@ export default function DiagnosisForm({ onSubmit, loading = false }) {
             </label>
             {parkingField}
           </div>
+          {/* 负荷曲线（既有专属选填）：上传后年电量走实测口径、电费反推让位，
+              储能定容/需量推定改用曲线最大需量（解析与口径见 utils/loadCurve.js） */}
+          <LoadCurveInput />
         </>
       )}
 

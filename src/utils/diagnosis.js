@@ -3,7 +3,10 @@
  * 电价与建筑基准一律从 config 读取；本文件只放「评级分档」这类分类逻辑常数。
  *
  * 口径（按建筑性质分流）：
- *   既有（实测口径）：年用电量(kWh) = 电费(万元，按年或按月×12) × 1e4 ÷ 电价；
+ *   既有（曲线实测口径，最优先）：上传负荷曲线 → 年用电量 = 平均功率 × 8760h，
+ *         电费反推让位；结果携带 curve 快照（最大需量/负荷率/粒度），供储能定容
+ *         与需量推定改走实测（recommend.js），estimate 为 null
+ *   既有（电费实测口径）：年用电量(kWh) = 电费(万元，按年或按月×12) × 1e4 ÷ 电价；
  *         实际强度 = 用电量 ÷ 面积；节能潜力% = max(0, (实际 − 基准) ÷ 实际 × 100)
  *   既有（预估口径，电费未知）：年用电量按「电耗预估参考」双口径取短板——
  *         面积口径 = 典型实际强度 × 面积；变压器口径 = kVA × 功率因数 × 负载率 × 8760h；
@@ -23,14 +26,16 @@ const STAR_THRESHOLD = 30
 
 /**
  * @param {{ buildingNature?: 'existing'|'new', area, buildingType, annualElectricityFee,
- *           feePeriod?: 'annual'|'monthly', transformerKva, designIntensity, province }} params
+ *           feePeriod?: 'annual'|'monthly', transformerKva, designIntensity, province,
+ *           loadCurve?: object|null }} params loadCurve 为 parseLoadCurve 的 stats
  * @param {object} config configStore 纯数值配置
  * @returns 诊断结果 | null（面积等无效时；电费未知走预估口径不再返回 null）
  *   既有：{ buildingNature, annualConsumption, actualIntensity, benchmarkIntensity,
- *           savingPotential, rating, estimate: { lines } | null（预估口径依据行，实测为 null） }
+ *           savingPotential, rating, estimate: { lines } | null（预估口径依据行，实测为 null）,
+ *           curve: { maxKw, avgKw, loadFactor, intervalMin, annualKwh, fileName } | null（曲线口径快照） }
  *   新建：{ buildingNature, annualConsumption(预估), actualIntensity(采用强度),
  *           benchmarkIntensity, savingPotential: null, rating: null,
- *           designChecked, checkResult: '达标'|'超标'|null, overRatio }
+ *           designChecked, checkResult: '达标'|'超标'|null, overRatio, curve: null }
  */
 export const calculateDiagnosis = (
   {
@@ -42,6 +47,7 @@ export const calculateDiagnosis = (
     transformerKva: rawTrafoKva,
     designIntensity: rawDesign,
     province,
+    loadCurve: rawCurve,
   },
   config,
 ) => {
@@ -67,19 +73,37 @@ export const calculateDiagnosis = (
       savingPotential: null,
       rating: null,
       designChecked,
+      curve: null,
       checkResult: designChecked ? (design <= benchmark ? '达标' : '超标') : null,
       overRatio: designChecked ? design / benchmark : 1,
     }
   }
 
-  // ── 既有建筑：电费反推（实测口径）；电费未知按电耗预估参考兜底（预估口径） ──
+  // ── 既有建筑：曲线实测（最优先）→ 电费反推（实测）→ 电耗预估参考兜底（预估） ──
   const feeRaw = Number(rawFee)
   const fee =
     Number.isFinite(feeRaw) && feeRaw > 0 ? feeRaw * (rawFeePeriod === 'monthly' ? 12 : 1) : null
 
   let annualConsumption
   let estimate = null // 预估口径依据行（实测口径为 null；UI 与模块③ 以此挂「预估」标注）
-  if (fee) {
+  // 曲线口径快照（有曲线才携带；下游 recommend.js 需量/定容改走实测最大需量）
+  const curve =
+    rawCurve && Number(rawCurve.annualKwh) > 0 && Number(rawCurve.maxKw) > 0
+      ? {
+          maxKw: Number(rawCurve.maxKw),
+          avgKw: Number(rawCurve.avgKw),
+          loadFactor: Number(rawCurve.loadFactor),
+          intervalMin: Number(rawCurve.intervalMin),
+          annualKwh: Number(rawCurve.annualKwh),
+          fileName: rawCurve.fileName ?? '',
+          notes: Array.isArray(rawCurve.notes) ? rawCurve.notes : [],
+        }
+      : null
+  if (curve) {
+    // 曲线实测：年电量 = 平均功率 × 8760（部分年数据同式外推，stats.notes 已注记）
+    annualConsumption = curve.annualKwh
+    estimate = null
+  } else if (fee) {
     annualConsumption = (fee * 10000) / prov.elecPrice // kWh
   } else {
     // 面积口径：分类型典型实际强度（存量调研中值，公开抽屉可调）× 面积
@@ -121,6 +145,7 @@ export const calculateDiagnosis = (
     savingPotential,
     rating,
     estimate,
+    curve,
   }
 }
 

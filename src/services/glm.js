@@ -93,13 +93,18 @@ export const buildPrompt = (project, diagnosis, config) => {
     `测算口径：套利按电网代理购电固定分时（${SPREAD_AS_OF}代理购电表），已计系统效率/放电深度/年可用天数与充电损耗工程修正；` +
     '用户转入市场化交易后固定分时价差不再执行，收益需按现货价差重估（行业情景中枢约下移 30%）'
   const dd = items.find((it) => it.type === 'storage')?.demandDetail
+  // 需量口径：baseKw 来自负荷曲线时为实测值，否则为双口径推定——据快照标记切换措辞，
+  // 不把实测写成推定（口径溯源是红线，AI 收到什么口径就写什么口径）
   const demandLine = dd && !dd.skipped
-    ? `需量管理收益已计入：推定最大需量约 ${Math.round(dd.baseKw)} kW，削峰 ${Math.round(dd.shavedKw)} kW × ${dd.price.toFixed(0)} 元/kW·月（两部制按需量计费推定，计费方式以电费单「基本电费」科目核定，容量计费用户无此项收益${dd.monthlyPerKva >= 260 ? '；月每 kVA 用电 ≥260 kWh 按 90% 档' : ''}）`
+    ? `需量管理收益已计入：${dd.measured ? `实测最大需量约 ${Math.round(dd.baseKw)} kW（负荷曲线${dd.intervalMin ? ` ${dd.intervalMin} 分钟口径` : ''}）` : `推定最大需量约 ${Math.round(dd.baseKw)} kW`}，削峰 ${Math.round(dd.shavedKw)} kW × ${dd.price.toFixed(0)} 元/kW·月（两部制按需量计费推定，计费方式以电费单「基本电费」科目核定，容量计费用户无此项收益${dd.monthlyPerKva >= 260 ? '；月每 kVA 用电 ≥260 kWh 按 90% 档' : ''}）`
     : dd?.skipped
       ? '需量管理收益未计入：推定变压器容量低于两部制门槛 315 kVA，按单一制口径'
       : '需量管理收益未计入（无模块① 诊断负荷推定）'
   const upsideLine =
-    '收益深化潜力（未计入测算数字，属或有收益，可定性提及、严禁虚构数字）：现货市场套利（市场化用户轨道）；需求响应/虚拟电厂聚合（上海案例结算价最高约 9 元/kWh）；辅助服务（调峰/调频/备用）；深化路径为 15 分钟级负荷曲线实测 + 逐时仿真'
+    '收益深化潜力（未计入测算数字，属或有收益，可定性提及、严禁虚构数字）：现货市场套利（市场化用户轨道）；需求响应/虚拟电厂聚合（上海案例结算价最高约 9 元/kWh）；辅助服务（调峰/调频/备用）；' +
+    (dd?.measured
+      ? '负荷曲线已接入实测口径，深化路径为逐时充放策略仿真，进一步核定储能定容与削峰策略'
+      : '深化路径为 15 分钟级负荷曲线实测 + 逐时仿真')
   // 集中供冷客户侧对比（确定性派生，同模块① 冷却触发依据；AI 仅润色不改数字）
   const coolingTco = selected.some((t) => t.key === 'cooling')
     ? coolingTcoNote(project.inputs.province, config)
@@ -146,9 +151,12 @@ export const buildPrompt = (project, diagnosis, config) => {
       : `建造年份：${di.year ?? '—'} 年${era ? `，属${era.label}` : ''}\n` +
         (era ? `年代改造侧重：${era.focus}（按标准代际确定性派生，润色时保持方向与结论）\n` : '') +
         (pvHint ? `光伏余量提示：${pvHint}（确定性提示，请保留）\n` : '') +
-        `年用电量：${fmt(d.annualConsumption / 1e4)} 万 kWh${d.estimate ? '（预估）' : ''}\n` +
-        `实际单位能耗：${fmt(d.actualIntensity)} kWh/㎡·a${d.estimate ? '（电费未知，按典型强度/变压器口径预估）' : ''}\n` +
+        `年用电量：${fmt(d.annualConsumption / 1e4)} 万 kWh${d.estimate ? '（预估）' : d.curve ? '（负荷曲线实测）' : ''}\n` +
+        `实际单位能耗：${fmt(d.actualIntensity)} kWh/㎡·a${d.estimate ? '（电费未知，按典型强度/变压器口径预估）' : d.curve ? '（曲线实测口径）' : ''}\n` +
         `行业基准能耗：${fmt(d.benchmarkIntensity, 0)} kWh/㎡·a\n` +
+        (d.curve
+          ? `负荷曲线实测：最大需量 ${Math.round(d.curve.maxKw)} kW · 负荷率 ${Math.round(d.curve.loadFactor * 100)}% · ${d.curve.intervalMin} 分钟粒度（需量与定容按此口径，请保留）\n`
+          : '') +
         `节能潜力：${fmt(d.savingPotential)} %${d.estimate ? '（预估口径，典型值推演非实测对标，请保留此标注）' : ''}\n` +
         `能效评级：${d.rating ?? '—'}\n`) +
     (d.buildingNature === 'new'

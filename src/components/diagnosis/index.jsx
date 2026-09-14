@@ -125,6 +125,7 @@ export default function DiagnosisModule({ wide = false, onApplied }) {
               annualConsumption: diagnosis.annualConsumption,
               transformerKva: diagnosis.transformerKva,
               parkingSpots: diagnosis.parkingSpots,
+              curve: diagnosis.curve ?? null,
             },
             config,
           )

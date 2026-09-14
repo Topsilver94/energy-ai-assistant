@@ -35,6 +35,8 @@ export default function ReportDocument({ wide = true, children }) {
 
   const f = feasibility?.total ?? {}
   const items = feasibility?.items ?? []
+  // 储能需量分项（含口径标记 measured）：报告注记与「深化路径」提示据此区分实测/推定口径
+  const storageDemand = items.find((it) => it.type === 'storage')?.demandDetail
 
   // 报告日期：挂载时定格（避免重渲染跳动）；敏感性与参数快照随 config 联动重算
   const date = useMemo(() => new Date().toLocaleDateString('zh-CN'), [])
@@ -202,27 +204,29 @@ export default function ReportDocument({ wide = true, children }) {
       </p>
 
       {/* 储能口径边界与需量注记（确定性文字，AI 正文与此同源）：套利按代理购电固定分时，
-          已计工程修正；需量收益按模块① 推定快照计入或如实注明未计 */}
+          已计工程修正；需量收益按模块① 快照计入或如实注明未计，口径随 dd.measured 区分实测/推定 */}
       {selected.some((t) => t.key === 'storage') && (
         <p className="mt-2 text-[11px] leading-relaxed text-paper-mute">
           储能套利按电网代理购电固定分时口径测算（{SPREAD_AS_OF}代理购电表），已计系统效率 / 放电深度 /
           年可用天数与充电损耗工程修正；用户转入市场化交易后固定分时价差不再执行，收益需按现货价差重估（行业情景中枢约下移
           30%，可用敏感性电价轴初判抗压性）。
           {(() => {
-            const dd = items.find((it) => it.type === 'storage')?.demandDetail
+            const dd = storageDemand
             if (dd && !dd.skipped)
-              return ` 需量管理收益已计入：推定最大需量 ${Math.round(dd.baseKw).toLocaleString()} kW × 削峰 ${Math.round(dd.shavedKw).toLocaleString()} kW × ${dd.price.toFixed(0)} 元/kW·月（两部制按需量计费推定，计费方式以电费单「基本电费」科目核定——容量计费用户无此项收益${dd.monthlyPerKva >= 260 ? '；月每 kVA 用电 ≥260 kWh 按 90% 档执行' : ''}）。`
+              return ` 需量管理收益已计入：${dd.measured ? `实测最大需量 ${Math.round(dd.baseKw).toLocaleString()} kW（负荷曲线${dd.intervalMin ? ` ${dd.intervalMin} 分钟口径` : ''}）` : `推定最大需量 ${Math.round(dd.baseKw).toLocaleString()} kW`} × 削峰 ${Math.round(dd.shavedKw).toLocaleString()} kW × ${dd.price.toFixed(0)} 元/kW·月（两部制按需量计费推定，计费方式以电费单「基本电费」科目核定——容量计费用户无此项收益${dd.monthlyPerKva >= 260 ? '；月每 kVA 用电 ≥260 kWh 按 90% 档执行' : ''}）。`
             if (dd?.skipped)
               return ' 需量管理收益未计入：推定变压器容量低于两部制门槛（315 kVA），按单一制口径。'
-            return ' 需量管理收益未计入（未采纳模块① 诊断或无负荷推定数据）。'
+            return ' 需量管理收益未计入（未采纳模块① 诊断或无最大需量数据）。'
           })()}
         </p>
       )}
       {selected.some((t) => t.key === 'storage') && (
         <p className="mt-2 text-[11px] leading-relaxed text-paper-mute">
           收益深化潜力（未计入上述测算数字，属或有收益）：现货市场套利（市场化用户轨道，与固定分时口径互斥）；需求响应
-          / 虚拟电厂聚合（上海案例结算价最高约 9 元/kWh）；辅助服务（调峰 / 调频 / 备用）。深化路径：以 15
-          分钟级实测负荷曲线替代类型推定系数，逐时仿真核定储能定容与需量削峰策略。
+          / 虚拟电厂聚合（上海案例结算价最高约 9 元/kWh）；辅助服务（调峰 / 调频 / 备用）。
+          {storageDemand?.measured
+            ? '深化路径：负荷曲线已按实测口径接入年电量与最大需量，可进一步做逐时充放策略仿真，核定储能定容与需量削峰策略。'
+            : '深化路径：以 15 分钟级实测负荷曲线替代类型推定系数，逐时仿真核定储能定容与需量削峰策略。'}
         </p>
       )}
 
