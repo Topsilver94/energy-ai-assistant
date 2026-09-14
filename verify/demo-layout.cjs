@@ -5,6 +5,7 @@
 //   ③ STEP3 报告渲染区吃满等高列且内部滚动（scrollHeight > clientHeight，
 //     证明报告被行高约束而非撑高整行），<lg 堆叠态不塌陷（≥ 400px）
 //   ④ 执行摘要数据卡 2×2（演示窄列；sm: 视口断点在窄列会挤成 4 列显示不全）
+//   ⑤ 两处分项明细表（模块② min-w-480 / 报告内 min-w-560）首列 sticky 固定
 // 依赖 dev server（默认 5173，DEMO_LAYOUT_URL 可覆盖）已启动
 const path = require('path')
 const fs = require('fs')
@@ -84,6 +85,24 @@ const check = (name, ok, detail) => {
     }
     // STEP3 报告渲染区（.report-doc 的滚动外层）；内部溢出 = 报告被行高约束
     const report = document.querySelector('.report-doc')?.parentElement
+    // 分项明细表首列 sticky（模块② min-w-480 与报告内 min-w-560）：横滑到最右后
+    // 表头首列仍贴容器左缘（容差 1px：有边框容器偏移 1、无边框容器偏移 0）
+    const tableSticky = (sel) => {
+      const table = document.querySelector(sel)
+      const wrap = table?.parentElement
+      if (!wrap || wrap.scrollWidth <= wrap.clientWidth) return null
+      wrap.scrollLeft = 9999
+      const th = table.querySelector('thead th')
+      const wr = wrap.getBoundingClientRect()
+      const out = {
+        pos: getComputedStyle(th).position,
+        offset: Math.round(th.getBoundingClientRect().left - wr.left),
+      }
+      wrap.scrollLeft = 0
+      return out
+    }
+    const itemTable = tableSticky('main table.min-w-\\[480px\\]')
+    const reportTable = tableSticky('.report-doc table.min-w-\\[560px\\]')
     // 执行摘要数据卡（report-doc 直接子级 grid 内）：演示窄列应为 2×2（前两卡同排）
     const kpi = [...document.querySelectorAll('.report-doc > div.grid > div')].slice(0, 4)
     const kpiTops = kpi.map((c) => Math.round(c.getBoundingClientRect().top))
@@ -95,6 +114,8 @@ const check = (name, ok, detail) => {
       sticky,
       reportH: report ? Math.round(report.getBoundingClientRect().height) : null,
       reportConfined: report ? report.scrollHeight / report.clientHeight : null,
+      itemTable,
+      reportTable,
       kpiTops,
     }
   })
@@ -127,6 +148,12 @@ const check = (name, ok, detail) => {
     && Math.abs(demo.kpiTops[0] - demo.kpiTops[1]) <= 1
     && demo.kpiTops[2] > demo.kpiTops[0] + 10,
     `top = ${demo.kpiTops.join(' / ')}`)
+  const ts = (t) =>
+    t != null && t.pos === 'sticky' && Math.abs(t.offset - 1) <= 1
+      ? `position=${t.pos} 左缘偏移=${t.offset}px`
+      : null
+  check('⑤a 模块② 分项明细首列 sticky', !!ts(demo.itemTable), ts(demo.itemTable) || JSON.stringify(demo.itemTable))
+  check('⑤b 报告分项明细首列 sticky', !!ts(demo.reportTable), ts(demo.reportTable) || JSON.stringify(demo.reportTable))
 
   await page.screenshot({ path: `${OUT}/demo-layout.png`, fullPage: true })
   console.log(`✓ 截图 ${OUT}/demo-layout.png（整页三列）`)

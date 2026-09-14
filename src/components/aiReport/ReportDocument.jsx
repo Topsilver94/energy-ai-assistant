@@ -141,12 +141,15 @@ export default function ReportDocument({ wide = true, children }) {
 
       <p className="mt-4 text-[11px] uppercase tracking-widest text-paper-mute">分项明细</p>
       {/* 长表允许跨页（打印表头重复），避免整块推挤造成页尾大空白；
-          窄屏容器内横滑看全列（列宽不压扁、不出阅读区），打印时恢复铺满 A4 版心 */}
+          窄屏容器内横滑看全列（列宽不压扁、不出阅读区），打印时恢复铺满 A4 版心。
+          首列「系统」sticky 固定（同敏感性表/模块② 分项明细）：横滑时行名不跟滑；
+          打印样式将 th/td 底色强制透明、边框归零（index.css @media print），sticky
+          加的底色与右缘分隔线不会进打印版 */}
       <div className="mt-2 overflow-x-auto print:overflow-visible">
         <table className="w-full min-w-[560px] border-collapse text-sm">
         <thead>
           <tr className="border border-line bg-ink-raised text-left font-semibold">
-            <th className="px-2 py-1.5">系统</th>
+            <th className="sticky left-0 z-10 border-r border-line bg-ink-raised px-2 py-1.5">系统</th>
             <th className="px-2 py-1.5">规模</th>
             <th className="px-2 py-1.5">投资 · 万元</th>
             <th className="px-2 py-1.5">IRR</th>
@@ -161,7 +164,9 @@ export default function ReportDocument({ wide = true, children }) {
             const carbon = it.carbonReduction > 0 ? fmt(it.carbonReduction) : '—'
             return (
               <tr key={it.type} className="border border-line">
-                <td className="px-2 py-1.5">{t?.label ?? it.type}</td>
+                <td className="sticky left-0 z-10 whitespace-nowrap border-r border-line bg-ink-panel px-2 py-1.5">
+                  {t?.label ?? it.type}
+                </td>
                 <td className="tabular px-2 py-1.5 font-mono">
                   {it.capacity} {t?.scaleUnit ?? ''}
                 </td>

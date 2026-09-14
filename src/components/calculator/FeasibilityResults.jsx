@@ -77,12 +77,17 @@ export default function FeasibilityResults() {
         修改「专家参数」保存后自动重算
       </p>
 
-      {/* 分项明细表：窄屏容器内横滑看全列（列宽不压扁、不出卡片），宽屏照常铺满 */}
+      {/* 分项明细表：窄屏容器内横滑看全列（列宽不压扁、不出卡片），宽屏照常铺满。
+          首列「系统」sticky 固定（同敏感性表）：横滑时行名不跟滑；底色取行底
+          （表头 ink-raised / 数据行卡面 ink-panel，hover 随行变 ink-hover——tr 加
+          group、sticky td 用 group-hover 同步），右缘细分隔线区分固定区与滑动区 */}
       <div className="mt-4 overflow-x-auto rounded-lg border border-line">
         <table className="w-full min-w-[480px] text-[13px]">
           <thead>
             <tr className="border-b border-line bg-ink-raised text-[11px] uppercase tracking-widest text-paper-mute">
-              <th className="px-3 py-2 text-left font-semibold">系统</th>
+              <th className="sticky left-0 z-10 border-r border-line bg-ink-raised px-3 py-2 text-left font-semibold">
+                系统
+              </th>
               <th className="px-3 py-2 text-right font-semibold">规模</th>
               <th className="px-3 py-2 text-right font-semibold">投资 · 万</th>
               <th className="px-3 py-2 text-right font-semibold">IRR</th>
@@ -98,9 +103,11 @@ export default function FeasibilityResults() {
               return (
                 <tr
                   key={item.type}
-                  className="border-b border-line/40 transition-colors last:border-0 hover:bg-ink-hover"
+                  className="group border-b border-line/40 transition-colors last:border-0 hover:bg-ink-hover"
                 >
-                  <td className="whitespace-nowrap px-3 py-2 text-paper">{t?.label ?? item.type}</td>
+                  <td className="sticky left-0 z-10 whitespace-nowrap border-r border-line bg-ink-panel px-3 py-2 text-paper group-hover:bg-ink-hover">
+                    {t?.label ?? item.type}
+                  </td>
                   <td className="tabular whitespace-nowrap px-3 py-2 text-right font-mono text-paper-mute">
                     {item.capacity} {t?.scaleUnit}
                   </td>
