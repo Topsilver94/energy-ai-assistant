@@ -1,11 +1,12 @@
-import { useEffect, useMemo } from 'react'
-import { Leaf, Timer, TrendingUp, Wallet } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Check, Copy, Leaf, Timer, TrendingUp, Wallet } from 'lucide-react'
 import DataCard from '../ui/DataCard'
 import SensitivityTable from './SensitivityTable'
 import { PROJECT_TYPES, useProjectStore } from '../../stores/projectStore'
 import { useConfigStore } from '../../stores/configStore'
 import { calculateFeasibility } from '../../utils/finance'
 import { buildSensitivity } from '../../utils/sensitivity'
+import { buildLedgerSnapshot, copyText } from '../../utils/export'
 
 /**
  * 模块② 结果区（组合测算）：4 张组合总账数据卡 + 分项明细表
@@ -17,6 +18,10 @@ export default function FeasibilityResults() {
   const config = useConfigStore((s) => s.config)
   const feasibility = useProjectStore((s) => s.feasibility)
   const isFeasibleDone = useProjectStore((s) => s.isFeasibleDone)
+
+  // 台账快照复制反馈：成功切「已复制 ✓」1.5s（同模块③ 复制按钮的微交互）
+  const [snapCopied, setSnapCopied] = useState(false)
+  const snapTimer = useRef(null)
 
   // config 引用仅在「保存配置 / 恢复默认」时变化；
   // 通过 getState() 取最新 inputs，避免把表单输入卷进依赖导致逐键重算
@@ -63,6 +68,16 @@ export default function FeasibilityResults() {
   // 格式化约定：投资 2 位、IRR 1 位百分数、回收期 1 位、碳减排 1 位
   const payback = total.paybackPeriod === 'N/A' ? 'N/A' : total.paybackPeriod.toFixed(1)
 
+  // 台账快照：影子测算 / 回测台账对账用（内部工具，不进对客报告）
+  const handleSnapshot = async () => {
+    const ok = await copyText(buildLedgerSnapshot(feasibility, config, PROJECT_TYPES))
+    if (ok) {
+      setSnapCopied(true)
+      window.clearTimeout(snapTimer.current)
+      snapTimer.current = window.setTimeout(() => setSnapCopied(false), 1500)
+    }
+  }
+
   return (
     <div className="mt-5 min-w-0">
       {/* 组合总账 */}
@@ -77,11 +92,34 @@ export default function FeasibilityResults() {
         修改「专家参数」保存后自动重算
       </p>
 
+      {/* 分项明细节头：右侧「复制台账快照」= 影子测算 / 回测台账的对账入口
+          （TSV 贴 Excel 自动分列；身份行含当次 AS_OF 数据版本，关键参数与报告
+          附表同源）。内部工具入口，不出现在打印报告 */}
+      <div className="mt-4 mb-2 flex items-center justify-between gap-2">
+        <p className="text-[11px] uppercase tracking-widest text-paper-mute">分项明细</p>
+        <button
+          type="button"
+          onClick={handleSnapshot}
+          className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-volt ${
+            snapCopied
+              ? 'border-volt/40 text-volt'
+              : 'border-line text-paper-mute hover:border-paper-mute hover:text-paper'
+          }`}
+        >
+          {snapCopied ? (
+            <Check size={12} strokeWidth={2.5} />
+          ) : (
+            <Copy size={12} strokeWidth={2.25} />
+          )}
+          {snapCopied ? '已复制' : '复制台账快照'}
+        </button>
+      </div>
+
       {/* 分项明细表：窄屏容器内横滑看全列（列宽不压扁、不出卡片），宽屏照常铺满。
           首列「系统」sticky 固定（同敏感性表）：横滑时行名不跟滑；底色取行底
           （表头 ink-raised / 数据行卡面 ink-panel，hover 随行变 ink-hover——tr 加
           group、sticky td 用 group-hover 同步），右缘细分隔线区分固定区与滑动区 */}
-      <div className="mt-4 overflow-x-auto rounded-lg border border-line">
+      <div className="overflow-x-auto rounded-lg border border-line">
         <table className="w-full min-w-[480px] text-[13px]">
           <thead>
             <tr className="border-b border-line bg-ink-raised text-[11px] uppercase tracking-widest text-paper-mute">

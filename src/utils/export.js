@@ -2,6 +2,74 @@
  * 复制 / 导出（CLAUDE.md §4）。
  * 导出 PDF 暂用 window.print() + 打印样式实现，Sprint 4 再评估 html2canvas + jspdf。
  */
+import { keyParams } from './report'
+import { SPREAD_AS_OF, ELECP_AS_OF, CYCLES_AS_OF, CHARGER_RATIO_AS_OF } from '../data/coefficients'
+
+/**
+ * 测算台账快照（影子测算 / 回测台账的对账入口）：把模块② 当次组合测算结果组装为
+ * Tab 分隔文本，贴进 Excel 自动分列。结构对应台账四 Sheet：
+ *   首行   = 项目身份（测算日期 / 省份 / 数据版本 AS_OF / 项目编号列留空手填）
+ *   分项表 = 预测快照（分项 + 合计：投资 / IRR / 回收期 / 碳减排）
+ *   参数段 = 当次关键系数（keyParams，与报告附表同源——台账与报告数字可互证）
+ * 纯函数：不触 DOM、不读 store；types（PROJECT_TYPES）由组件层喂入，保持 utils
+ * 不依赖 stores 的方向纪律
+ * @param {object|null} feasibility calculateFeasibility 的结果（projectStore.feasibility）
+ * @param {object} config configStore 的系数快照
+ * @param {Array} types PROJECT_TYPES（label / scaleUnit 来源）
+ * @returns {string} TSV 文本；feasibility 为空时返回空串
+ */
+export const buildLedgerSnapshot = (feasibility, config, types) => {
+  if (!feasibility) return ''
+  const { total, items, province } = feasibility
+  const meta = (t) => types.find((x) => x.key === t)
+  const irr = (v) => (Number.isFinite(v) ? `${(v * 100).toFixed(1)}%` : '—')
+  const payback = (v) => (v === 'N/A' ? 'N/A' : v.toFixed(1))
+  const carbon = (v) => (v > 0 ? v.toFixed(1) : '—')
+
+  const lines = []
+  lines.push(
+    [
+      '测算快照',
+      new Date().toLocaleDateString('zh-CN'),
+      province,
+      `数据版本 电价${ELECP_AS_OF}/价差${SPREAD_AS_OF}/分时${CYCLES_AS_OF}/配建${CHARGER_RATIO_AS_OF}`,
+      '项目编号（手填）',
+    ].join('\t'),
+  )
+  lines.push('')
+  lines.push(['系统', '规模', '投资·万元', 'IRR', '回收期·年', '碳减排·tCO₂/a'].join('\t'))
+  items.forEach((it) =>
+    lines.push(
+      [
+        meta(it.type)?.label ?? it.type,
+        `${it.capacity} ${meta(it.type)?.scaleUnit ?? ''}`,
+        it.totalInvestment.toFixed(1),
+        irr(it.irr),
+        payback(it.paybackPeriod),
+        carbon(it.carbonReduction),
+      ].join('\t'),
+    ),
+  )
+  lines.push(
+    [
+      '合计',
+      '—',
+      total.totalInvestment.toFixed(2),
+      irr(total.irr),
+      payback(total.paybackPeriod),
+      carbon(total.carbonReduction),
+    ].join('\t'),
+  )
+  lines.push('')
+  lines.push('关键参数')
+  const systems = Object.fromEntries(
+    items.map((it) => [it.type, { enabled: true, capacity: it.capacity }]),
+  )
+  keyParams(systems, config, province).forEach(([k, v]) => lines.push([k, v].join('\t')))
+  // 组合年毛收益随参数段入账：收益回测（预测收益 vs 结算收益）的对账基准
+  lines.push(['组合年毛收益·万元', total.annualRevenue.toFixed(1)].join('\t'))
+  return lines.join('\n')
+}
 
 /** 复制文本到剪贴板，返回是否成功（含非安全上下文的 execCommand 兜底） */
 export const copyText = async (text) => {

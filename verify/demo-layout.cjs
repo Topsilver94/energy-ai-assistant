@@ -6,6 +6,7 @@
 //     证明报告被行高约束而非撑高整行），<lg 堆叠态不塌陷（≥ 400px）
 //   ④ 执行摘要数据卡 2×2（演示窄列；sm: 视口断点在窄列会挤成 4 列显示不全）
 //   ⑤ 两处分项明细表（模块② min-w-480 / 报告内 min-w-560）首列 sticky 固定
+//   ⑥ 台账快照：复制按钮 → 剪贴板 TSV（身份行 + 分项表 + 关键参数段）
 // 依赖 dev server（默认 5173，DEMO_LAYOUT_URL 可覆盖）已启动
 const path = require('path')
 const fs = require('fs')
@@ -34,7 +35,12 @@ const check = (name, ok, detail) => {
 ;(async () => {
   fs.mkdirSync(OUT, { recursive: true })
   const browser = await chromium.launch()
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+  // clipboard 权限：⑥ 台账快照断言要读 navigator.clipboard（localhost 属安全上下文）
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+    permissions: ['clipboard-read', 'clipboard-write'],
+  })
+  const page = await context.newPage()
   const errs = []
   page.on('pageerror', (e) => errs.push(String(e)))
   await page.goto(URL, { waitUntil: 'networkidle' })
@@ -48,6 +54,12 @@ const check = (name, ok, detail) => {
   await page.waitForTimeout(400)
   await page.locator('button:has-text("开始测算")').click()
   await page.locator('text=组合投资').first().waitFor({ timeout: 8000 })
+
+  // ── 台账快照（工作态即可测）：复制 → 按钮反馈 → 剪贴板 TSV 内容 ──
+  await page.locator('button:has-text("复制台账快照")').click()
+  await page.locator('button:has-text("已复制")').waitFor({ timeout: 3000 })
+  const ledger = await page.evaluate(() => navigator.clipboard.readText())
+
   await page.locator('nav[aria-label="模块导航"] button:has-text("订制方案")').click()
   await page.locator('button:has-text("生成方案报告")').click()
   await page.locator('.report-doc').waitFor({ timeout: 8000 })
@@ -154,6 +166,10 @@ const check = (name, ok, detail) => {
       : null
   check('⑤a 模块② 分项明细首列 sticky', !!ts(demo.itemTable), ts(demo.itemTable) || JSON.stringify(demo.itemTable))
   check('⑤b 报告分项明细首列 sticky', !!ts(demo.reportTable), ts(demo.reportTable) || JSON.stringify(demo.reportTable))
+  check('⑥ 台账快照剪贴板 TSV', ledger.includes('系统\t规模')
+    && ledger.includes('合计\t—\t') && ledger.includes('关键参数')
+    && ledger.includes('数据版本'),
+    `首行「${ledger.split('\n')[0]}」，共 ${ledger.split('\n').length} 行`)
 
   await page.screenshot({ path: `${OUT}/demo-layout.png`, fullPage: true })
   console.log(`✓ 截图 ${OUT}/demo-layout.png（整页三列）`)
