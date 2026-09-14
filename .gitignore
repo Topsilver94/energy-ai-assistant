@@ -12,3 +12,7 @@ verify/aikey.txt
 
 # 本机网络代理辅助脚本（个人环境，不入库）
 proxy-github.cjs
+
+# 工具展示说明：仓外递送材料（HTML 单文件 + md 源稿），README 已覆盖仓库读者
+docs/工具展示说明.md
+docs/工具展示说明.html
