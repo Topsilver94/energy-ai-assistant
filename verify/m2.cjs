@@ -160,7 +160,7 @@ const log = (m) => {
 
   // ── 场景C：既有工业厂房（扩类型回归：基准180电费全口径、大屋面光伏、措施文案、热力图位置、供冷置信度降级标注） ──
   await page.locator('button:has-text("既有建筑")').click()
-  await page.locator('select').first().selectOption('工业厂房')
+  await page.locator('label:has-text("建筑类型") select').selectOption('工业厂房')
   await page.locator('input[placeholder="如 10000"]').fill('20000')
   await page.locator('input[placeholder^="留空按典型强度"]').fill('200')
   await page.locator('button:has-text("开始诊断")').click()
@@ -180,7 +180,7 @@ const log = (m) => {
   log('场景C 既有工业厂房诊断完成（新增类型回归）')
 
   // ── 场景D：既有商场（集中供冷双口径：占比折净 + 冷量折算） ──
-  await page.locator('select').first().selectOption('商场')
+  await page.locator('label:has-text("建筑类型") select').selectOption('商场')
   await page.locator('input[placeholder="如 10000"]').fill('20000')
   await page.locator('input[placeholder^="留空按典型强度"]').fill('200')
   await page.locator('button:has-text("开始诊断")').click()
@@ -199,8 +199,8 @@ const log = (m) => {
 
   // ── 场景E：屋面类型分支（坡屋面打折 + 新建 BIPV 满铺） ──
   await page.locator('button:has-text("既有建筑")').click()
-  await page.locator('select').first().selectOption('办公')
-  await page.locator('select').nth(2).selectOption('坡屋面')
+  await page.locator('label:has-text("建筑类型") select').selectOption('办公')
+  await page.locator('label:has-text("屋面类型") select').selectOption('坡屋面')
   await page.locator('button:has-text("开始诊断")').click()
   await page.waitForTimeout(600)
   report.extracted.roofSlope = await page.evaluate(() => {
@@ -211,7 +211,7 @@ const log = (m) => {
     }
   })
   await page.locator('button:has-text("新建建筑")').click()
-  await page.locator('select').first().selectOption('办公')
+  await page.locator('label:has-text("建筑类型") select').selectOption('办公')
   await page.locator('button:has-text("开始诊断")').click()
   await page.waitForTimeout(600)
   report.extracted.roofBipv = await page.evaluate(() => {
@@ -219,7 +219,8 @@ const log = (m) => {
     return {
       has252Kw: body.includes('建议约 252 kW'),
       hasBipvNote: body.includes('新建按 BIPV 一体化满铺测算'),
-      noRoofSelect: document.querySelectorAll('select').length === 2, // 仅 类型 + 省份
+      // 新建分支无屋面类型字段：全页仅 1 个 select（建筑类型；省份为按钮选择器，不占 select）
+      noRoofSelect: document.querySelectorAll('select').length === 1,
     }
   })
   await page.screenshot({ path: path.join(shotDir, 'm2-07-roof-bipv.png'), fullPage: true })
@@ -227,7 +228,7 @@ const log = (m) => {
 
   // ── 场景F：电费未知兜底（面积口径 → 变压器口径取短板 → 月度电费转实测） ──
   await page.locator('button:has-text("既有建筑")').click()
-  await page.locator('select').first().selectOption('办公')
+  await page.locator('label:has-text("建筑类型") select').selectOption('办公')
   await page.locator('input[placeholder="如 10000"]').fill('20000')
   await page.locator('input[placeholder^="留空按典型强度"]').fill('')
   await page.locator('input[placeholder="留空按类型指标推定"]').fill('')
@@ -296,7 +297,7 @@ const log = (m) => {
   // ── 场景H：屋面面积实填（塔楼/综合体形态系数失真场景的实证口径）──
   //    既有办公·平屋面·实填 4,000 ㎡：4,000 × 0.8 障碍折减 × 1.0 = 3,200 ㎡ × 0.1 kW/㎡ = 320 kW
   //    （推定口径 200 kW＝20,000 × 0.1 × 1.0 × 0.1，场景A 已回归；E 设过坡屋面，先复位平屋面）
-  await page.locator('select').nth(2).selectOption('平屋面')
+  await page.locator('label:has-text("屋面类型") select').selectOption('平屋面')
   await page.locator('input[placeholder="留空按类型系数估算"]').fill('4000')
   await page.locator('button:has-text("开始诊断")').click()
   await page.waitForTimeout(600)
