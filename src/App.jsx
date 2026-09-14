@@ -65,7 +65,9 @@ export default function App() {
           </div>
         </main>
       ) : (
-        /* 演示模式：三列同屏全貌 */
+        /* 演示模式：三列同屏全貌。grid 默认拉伸使三列等高，各模块 Card 在
+           wide=false 时补 h-full 跟随列高（测算后底边对齐、不再参差），
+           STEP3 报告渲染区 flex-1 吃满多出的高度 */
         <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8 print:px-0 print:py-0">
           <section className="no-print mb-6">
             <h2 className="text-2xl font-bold">挖掘痛点 · 锁定收益 · 订制方案，三步闭环</h2>

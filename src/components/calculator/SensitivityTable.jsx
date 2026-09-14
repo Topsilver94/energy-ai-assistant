@@ -2,7 +2,9 @@
 // 依赖（可独立 SSR 冒烟）。单元格两行制：主行 IRR，副行 回收期 + 相对基准偏差；
 // 偏差优 = volt / 劣 = amber（§6 唯一警示色），跌破折现率的 IRR 数值转 amber。
 const HEADERS = ['-20%', '-10%', '基准', '+10%', '+20%']
-const GRID = 'grid grid-cols-[88px_repeat(5,minmax(0,1fr))]'
+// min-w 560：保证副行「+x.xpp · y.y 年」一行放下不折行；窄容器（演示模式三列）
+// 由外层 overflow-x-auto 横滑收纳，不再因单元格折行把行高与整列高度撑爆
+const GRID = 'grid min-w-[560px] grid-cols-[88px_repeat(5,minmax(0,1fr))]'
 
 const paybackText = (p) =>
   p.paybackPeriod === 'N/A' || p.irr == null ? '—' : `${p.paybackPeriod.toFixed(1)} 年`
@@ -34,7 +36,7 @@ export default function SensitivityTable({ sensitivity }) {
         <span className="text-[11px] text-paper-mute/80">单变量扰动 · 其他参数不变</span>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-line">
+      <div className="overflow-x-auto rounded-lg border border-line">
         {/* 表头 */}
         <div className={`${GRID} border-b border-line bg-ink-panel`}>
           <div className="px-2.5 py-2 text-[11px] uppercase tracking-widest text-paper-mute">

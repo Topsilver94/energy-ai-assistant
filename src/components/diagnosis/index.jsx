@@ -133,7 +133,7 @@ export default function DiagnosisModule({ wide = false, onApplied }) {
   )
 
   return (
-    <Card className="no-print flex flex-col p-6">
+    <Card className={`no-print flex flex-col p-6 ${wide ? '' : 'h-full'}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded bg-ink-raised text-volt">
