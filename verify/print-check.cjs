@@ -52,7 +52,6 @@ function pdfMargins(pdfPath) {
     // 一层整页画布 `0 0 612 956 re\nf`——它 re 后是 f 非 W，故不受影响。若页面无 W 裁剪盒
     // （理论不出现）则回退取任一 re 片段兜底。
     const cre = /([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)\s+re\s*W\*?\s*n/g
-    let c
     const box = cre.exec(t)?.slice(1, 5).map(parseFloat) ?? t.match(/([\d.-]+)\s+([\d.-]+)\s+[\d.-]+\s+[\d.-]+\s+re/)?.slice(1, 3).concat([0, 0]).map(parseFloat)
     if (!box) continue
     const [qx, qy, , h] = box
