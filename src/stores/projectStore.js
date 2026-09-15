@@ -31,10 +31,6 @@ export const useProjectStore = create((set) => ({
   },
   feasibility: null,
   isFeasibleDone: false,
-  // 方案比选快照（A/B 两槽，售前「给我两个配置」场景）：存当次 inputs
-  // （systems/province/demand 深拷贝）+ feasibility 结果，PlanCompare 并排对比；
-  // 同槽再存覆盖。会话态不持久化——重测不丢（比选正需要跨次测算留存）
-  plans: { A: null, B: null },
 
   setInput: (patch) => set((s) => ({ inputs: { ...s.inputs, ...patch } })),
   // 单系统补丁（开关 / 规模），保持 systems 不可变更新
@@ -56,26 +52,6 @@ export const useProjectStore = create((set) => ({
       },
     })),
   setFeasibility: (result) => set({ feasibility: result, isFeasibleDone: true }),
-  // 存方案快照（深拷贝防后续表单编辑串改已存方案）；无测算结果时忽略
-  savePlan: (slot) =>
-    set((s) => {
-      if (!s.feasibility || (slot !== 'A' && slot !== 'B')) return {}
-      return {
-        plans: {
-          ...s.plans,
-          [slot]: {
-            savedAt: Date.now(),
-            inputs: {
-              province: s.inputs.province,
-              demand: s.inputs.demand,
-              systems: JSON.parse(JSON.stringify(s.inputs.systems)),
-            },
-            feasibility: s.feasibility,
-          },
-        },
-      }
-    }),
-  clearPlan: (slot) => set((s) => ({ plans: { ...s.plans, [slot]: null } })),
   // 一键采纳模块① 推荐组合：仅启用 level 为「推荐/可考虑」的系统并填入建议规模，
   // 谨慎/暂缓项关闭；未采纳项保留原规模。覆盖语义——UI 侧已做两段式确认。
   // 需量推定快照随储能推荐一并带入（无储能推荐时置 null，② 不计需量收益）

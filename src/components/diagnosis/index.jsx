@@ -10,7 +10,7 @@ import { useDiagnosisStore } from '../../stores/diagnosisStore'
 import { useConfigStore } from '../../stores/configStore'
 import { useProjectStore } from '../../stores/projectStore'
 import { calculateDiagnosis } from '../../utils/diagnosis'
-import { buildRecommendations } from '../../utils/recommend'
+import { recommendFromDiagnosis } from '../../utils/recommend'
 
 // 最短 loading 时长（UX 常数，防结果闪现，同模块②）
 const MIN_LOADING_MS = 300
@@ -109,29 +109,10 @@ export default function DiagnosisModule({ wide = false, onApplied }) {
     else showToast('已填入模块②推荐组合，可调整规模后开始测算')
   }
 
-  // 推荐引擎：从诊断快照确定性派生（config 变化随诊断重算一并刷新，与结果区同源）
-  const recs = useMemo(
-    () =>
-      diagnosis
-        ? buildRecommendations(
-            {
-              buildingNature: diagnosis.buildingNature ?? 'existing',
-              buildingType: diagnosis.buildingType,
-              area: diagnosis.area,
-              province: diagnosis.province,
-              roofType: diagnosis.roofType,
-              roofArea: diagnosis.roofArea,
-              year: diagnosis.year,
-              annualConsumption: diagnosis.annualConsumption,
-              transformerKva: diagnosis.transformerKva,
-              parkingSpots: diagnosis.parkingSpots,
-              curve: diagnosis.curve ?? null,
-            },
-            config,
-          )
-        : [],
-    [diagnosis, config],
-  )
+  // 推荐引擎：从诊断快照确定性派生（config 变化随诊断重算一并刷新，与结果区同源）。
+  // 快照→入参的映射集中在 recommendFromDiagnosis，模块② 方案比选复用同一入口——
+  // 两处逐字同源，避免各写一份映射后悄悄漂移
+  const recs = useMemo(() => recommendFromDiagnosis(diagnosis, config), [diagnosis, config])
 
   return (
     <Card className={`no-print flex flex-col p-6 ${wide ? '' : 'h-full'}`}>

@@ -390,3 +390,30 @@ export const buildRecommendations = (
     },
   ].sort((a, b) => b.score - a.score)
 }
+
+/**
+ * 从模块① 诊断结果快照派生推荐（模块① 结果区与模块② 方案比选共用同一入口）。
+ *
+ * 快照字段 → 引擎入参的映射只此一份：两处组件各自 useMemo 调本函数，
+ * 同入参 + 同 config ⇒ 同输出，故比选档位与 STEP1 推荐列表逐字一致，不需入 store。
+ * area 非法时引擎返回空数组（未诊断 / 未填面积 → 比选显示引导语）。
+ */
+export const recommendFromDiagnosis = (diagnosis, config) =>
+  diagnosis
+    ? buildRecommendations(
+        {
+          buildingNature: diagnosis.buildingNature ?? 'existing',
+          buildingType: diagnosis.buildingType,
+          area: diagnosis.area,
+          province: diagnosis.province,
+          roofType: diagnosis.roofType,
+          roofArea: diagnosis.roofArea,
+          year: diagnosis.year,
+          annualConsumption: diagnosis.annualConsumption,
+          transformerKva: diagnosis.transformerKva,
+          parkingSpots: diagnosis.parkingSpots,
+          curve: diagnosis.curve ?? null,
+        },
+        config,
+      )
+    : []
