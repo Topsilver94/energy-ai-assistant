@@ -102,9 +102,11 @@ export default function DiagnosisModule({ wide = false, onApplied }) {
   }
 
   // 采纳推荐 → 单击覆盖式写入模块②测算。
-  // 工作模式填完即跳测算页（表单已填状态即反馈）；演示模式三列同屏，用 toast 提示
+  // 工作模式填完即跳测算页（表单已填状态即反馈）；演示模式三列同屏，用 toast 提示。
+  // 省份随推荐一并携带：①② 是同一项目的两段（先诊断后开方），电价/利用小时/峰谷价差
+  // 都按省取数——两个模块各持一个省份，等于把同一个项目算成两个地方
   const handleApply = (recs) => {
-    applyRecommendation(recs)
+    applyRecommendation(recs, diagnosis?.province)
     if (onApplied) onApplied()
     else showToast('已填入模块②推荐组合，可调整规模后开始测算')
   }

@@ -10,11 +10,12 @@ import { LEVEL_TONES } from '../diagnosis/RecommendationList'
  * 方案比选（模块② 结果区）：按模块① 的推荐自动生成配置档位，一档一行列账——
  * 售前高频「给我两个配置」的决策工具。
  *
- * 档位口径：
+ * 档位口径（自上而下＝读者关心的顺序）：
  * - 单项档：模块① 推荐列表里的每一项（含谨慎/暂缓），按其建议规模单独测算
- * - 合计档：上述各项按建议规模全上，IRR/回收期取各系统合并现金流
- * - 当前配置档：模块② 表单现值——直接复用已展示的组合总账（与上方数据卡同源），
- *   不重算，避免同一份配置在两处出现两个数
+ * - 当前配置档：直接复用已展示的组合总账（与上方数据卡同源），不重算，避免同一份配置
+ *   在两处出现两个数；紧跟单项档，是用户此刻手上那份账。构成与省份都取那次测算的快照，
+ *   表单改了未重测时不跟着变（旧数字不挂新规模/新省份）
+ * - 合计档：上述各项按建议规模全上，IRR/回收期取各系统合并现金流；假想参照，置于末位
  *
  * 为什么档位不带优先级、不设 Δ 列、不做优劣着色：模块① 的 score 是四把不同量纲
  * 的尺子——光伏单调于装机规模、储能只有「价差过线与否 × 负荷平稳与否」四种取值、
@@ -58,12 +59,16 @@ export default function PlanCompare() {
   // 与模块① 结果区同一入口、同一 config ⇒ 档位与 STEP1 推荐列表逐字一致（无需入 store）
   const recs = useMemo(() => recommendFromDiagnosis(diagnosis, config), [diagnosis, config])
 
-  // 当前配置的构成（模块② 表单现值；规模为空的项不列）
-  const activeSummary = PROJECT_TYPES.filter(
-    (t) => projectInputs.systems[t.key]?.enabled && Number(projectInputs.systems[t.key].capacity) > 0,
-  )
-    .map((t) => `${SHORT[t.key]} ${projectInputs.systems[t.key].capacity}${t.scaleUnit}`)
-    .join(' + ')
+  // 当前配置的构成：取自「那次测算」的分项快照（feasibility.items），不是表单现值。
+  // 该行的数字就是那次测算的，构成必须同源——否则表单改了规模还没重测时，会把新规模
+  // 挂到旧数字上（省份已同样处理：口径行标的是 feasibility.province）。
+  // 一系统一行：拼成一行时三四个系统会把「档位」列撑到最宽，短名+多行更省横向空间
+  const activeParts = useMemo(() => {
+    const byType = new Map((feasibility?.items ?? []).map((it) => [it.type, it.capacity]))
+    return PROJECT_TYPES.filter((t) => byType.has(t.key)).map(
+      (t) => `${SHORT[t.key]} ${byType.get(t.key)}${t.scaleUnit}`,
+    )
+  }, [feasibility])
 
   const rows = useMemo(() => {
     const out = recs.map((rec) => ({
@@ -75,6 +80,11 @@ export default function PlanCompare() {
       // 故单项档与合计档里的储能分项不会出现两个数
       demand: rec.key === 'storage' ? (rec.demand ?? null) : null,
     }))
+    // 当前配置档：复用 store 里已展示的测算结果（须已测算且有有效系统）。
+    // 置于单项档之后、合计档之前——再往下是假想的「全上」
+    if (feasibility && activeParts.length > 0) {
+      out.push({ id: '__active', name: '当前配置', sub: activeParts, total: true, useStoreResult: true })
+    }
     // 合计档：仅一项时与单项档重复，不出
     if (recs.length > 1) {
       out.push({
@@ -87,12 +97,8 @@ export default function PlanCompare() {
         demand: recs.find((r) => r.key === 'storage')?.demand ?? null,
       })
     }
-    // 当前配置档：复用 store 里已展示的测算结果（须已测算且有有效系统）
-    if (feasibility && activeSummary) {
-      out.push({ id: '__active', name: '当前配置', sub: activeSummary, total: true, useStoreResult: true })
-    }
     return out
-  }, [recs, feasibility, activeSummary])
+  }, [recs, feasibility, activeParts])
 
   // 各档测算：单项/合计档按① 诊断省份（与① 热力图同口径），当前配置档直取 store 结果
   const accounts = useMemo(() => {
@@ -114,8 +120,11 @@ export default function PlanCompare() {
   // 不假装档位齐备。此分支必然可达（本组件只在② 有测算结果时挂载）
   const hasRecs = recs.length > 0
   const diagProvince = diagnosis?.province ?? null
-  // ① 诊断省份与② 表单省份可能不同（「填入模块②」不携带省份）：表内跨省则如实标出
-  const crossProvince = Boolean(hasRecs && diagProvince && diagProvince !== projectInputs.province)
+  // 当前配置档标注「那次测算实际用的省份」（feasibility.province），不是表单现值：
+  // 「填入模块②」会改写表单省份而不重算，若按表单现值标注，会把广东测出的数字说成安徽的
+  const activeProvince = feasibility?.province ?? projectInputs.province
+  // 两处口径跨省则如实标出（①诊断省 ≠ 当前配置那次测算用的省）
+  const crossProvince = Boolean(hasRecs && diagProvince && diagProvince !== activeProvince)
   const noteLead = hasRecs
     ? `各档规模取① 建议值，收益按① 诊断省份 ${diagProvince} 测算；合计档收益取各系统合并现金流，非各单项加权。`
     : ''
@@ -170,8 +179,12 @@ export default function PlanCompare() {
                   >
                     {row.name}
                     {row.sub && (
-                      <span className="block font-mono text-[10px] font-normal text-paper-mute">
-                        {row.sub}
+                      <span className="mt-0.5 block font-mono text-[10px] font-normal leading-snug text-paper-mute">
+                        {row.sub.map((line) => (
+                          <span key={line} className="block">
+                            {line}
+                          </span>
+                        ))}
                       </span>
                     )}
                   </td>
@@ -205,7 +218,7 @@ export default function PlanCompare() {
 
       {/* 口径说明：档位规模/收益的口径来源与省份；跨省（①诊断省 ≠ ②表单省）时转 amber 警示 */}
       <p className={`mt-1.5 text-[11px] leading-relaxed ${crossProvince ? 'text-amber' : 'text-paper-mute'}`}>
-        {noteLead}当前配置为模块② 上次测算结果（省份 {projectInputs.province}）
+        {noteLead}当前配置为模块② 上次测算结果（省份 {activeProvince}）
         {crossProvince && '——与其余档位跨省，仅可作量级参考'}。系统寿命不一，各档回收期宜与 IRR 同看
       </p>
     </div>
