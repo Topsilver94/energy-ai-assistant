@@ -11,8 +11,8 @@
 //     落点 = 该列顶部（顶栏下方）、STEP③ 报告内部滚动归零、描边**悬浮跟随**（点击不留
 //     常驻态，鼠标设备）、不引入横向溢出
 //   ⑧ 演示窄列下推荐卡标题单行不折行（行数按实测行高换算，非固定像素）
-//   ⑨ 空态跳转 STEP③ 后「生成方案报告」CTA 落在首屏内（演示卡片被拉伸到整行高，
-//     居中会把 CTA 推到卡片中部）
+//   ⑨ 空态跳转 STEP③ 后「生成方案报告」CTA 落在首屏内、且位于首屏中部（视口 45–68% 高）
+//     ——演示卡片被拉伸到整行高（2276px），贴顶与居中都不可取
 // 依赖 dev server（默认 5173，DEMO_LAYOUT_URL 可覆盖）已启动
 const path = require('path')
 const fs = require('fs')
@@ -339,11 +339,21 @@ const check = (name, ok, detail) => {
     )
     if (!btn) return null
     const r = btn.getBoundingClientRect()
-    return { top: Math.round(r.top), bottom: Math.round(r.bottom), vh: window.innerHeight }
+    return {
+      top: Math.round(r.top),
+      bottom: Math.round(r.bottom),
+      center: Math.round((r.top + r.bottom) / 2),
+      vh: window.innerHeight,
+    }
   })
   check('⑨ 跳转 STEP③ 后生成按钮在首屏内（无需滚动）',
     cta != null && cta.top >= 0 && cta.bottom <= cta.vh,
     cta ? `按钮 ${cta.top}–${cta.bottom}px / 视口高 ${cta.vh}px` : '未找到生成按钮')
+  // ⑨c 位置契约：卡被拉伸到 2276px 时，贴顶与居中两头都不对——要的是首屏中部（约 55% 高）
+  const ratio = cta ? cta.center / cta.vh : 0
+  check('⑨c 按钮落在首屏中部（视口 45–68% 高，非贴顶、非卡片正中）',
+    cta != null && ratio >= 0.45 && ratio <= 0.68,
+    cta ? `中心 ${cta.center}px = 视口 ${(ratio * 100).toFixed(0)}%` : '未找到生成按钮')
   check('⑨b 空态页无渲染错误', errs2.length === 0, errs2[0] || '')
   await p2.close()
 

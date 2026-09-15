@@ -246,11 +246,18 @@ export default function AIReportPanel({ wide = false }) {
       )}
 
       {/* 依赖齐备：生成按钮（最强 CTA 反色白底 pill）。
-          框内**顶端对齐**而非垂直居中：演示模式卡片被拉伸到整行高（可达 2400px+），
-          居中会把 CTA 推到卡片中部——从书签跳 STEP③ 时正好落在首屏之外。
-          虚线框仍 flex-1 填满卡片，不留空洞 */}
+         框内位置：贴顶则 CTA 挤在框口，垂直居中又会把它推到卡片正中——演示模式卡片
+         被三列里最长的一列拉伸（实测 2276px），正中在 y≈1494，从书签跳 STEP③ 时正好
+         落在首屏之外。故拉伸态（演示模式 ≥lg，卡片 lg:absolute lg:inset-0 吃满列高）
+         内推约 1/4 视口高，让 CTA 落在**首屏中部**（视口约 55% 高）；工作模式与窄屏
+         卡片不被拉伸（框高=内容高），上推无意义，保持贴顶。
+         虚线框仍 flex-1 填满卡片，不留空洞 */}
       {ready && !hasReport && !isGenerating && (
-        <div className="no-print mt-5 flex flex-1 flex-col items-center rounded-lg border border-dashed border-line px-4 pb-8 pt-6">
+        <div
+          className={`no-print mt-5 flex flex-1 flex-col items-center rounded-lg border border-dashed border-line px-4 pb-8 ${
+            wide ? 'pt-6' : 'pt-6 lg:pt-[25vh]'
+          }`}
+        >
           <Button variant="inverse" size="lg" onClick={handleGenerate}>
             <Rocket size={18} />
             生成方案报告
