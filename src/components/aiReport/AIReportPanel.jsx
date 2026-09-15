@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
@@ -23,7 +23,7 @@ import { useDiagnosisStore } from '../../stores/diagnosisStore'
 import { useAiStore } from '../../stores/aiStore'
 import { useConfigStore } from '../../stores/configStore'
 import { buildPrompt, generateReportStream } from '../../services/glm'
-import { buildReportDraft } from '../../utils/report'
+import { basisDrift, buildReportDraft, reportBasisOf } from '../../utils/report'
 import { copyText, exportGuideHint, exportPdf } from '../../utils/export'
 
 /**
@@ -61,7 +61,10 @@ function ToolTile({ icon: Icon, label, onClick, pressed = false }) {
 /** wide（工作模式）：满宽阅读，方案渲染区加高，尽量一页收纳 */
 export default function AIReportPanel({ wide = false }) {
   const isFeasibleDone = useProjectStore((s) => s.isFeasibleDone)
+  const projectInputs = useProjectStore((s) => s.inputs)
   const isDiagnosisDone = useDiagnosisStore((s) => s.isDiagnosisDone)
+  const diagnosisInputs = useDiagnosisStore((s) => s.inputs)
+  const diagnosisResult = useDiagnosisStore((s) => s.diagnosis)
   const isGenerating = useAiStore((s) => s.isGenerating)
   const reportContent = useAiStore((s) => s.reportContent)
   const thinking = useAiStore((s) => s.thinking)
@@ -77,6 +80,8 @@ export default function AIReportPanel({ wide = false }) {
   const appendThinking = useAiStore((s) => s.appendThinking)
   const setError = useAiStore((s) => s.setError)
   const clearReport = useAiStore((s) => s.clearReport)
+  const reportBasis = useAiStore((s) => s.reportBasis)
+  const setReportBasis = useAiStore((s) => s.setReportBasis)
   const config = useConfigStore((s) => s.config)
 
   const [copied, setCopied] = useState(false)
@@ -87,6 +92,22 @@ export default function AIReportPanel({ wide = false }) {
 
   const ready = isFeasibleDone && isDiagnosisDone
   const hasReport = reportContent.length > 0
+
+  // 上游漂移检测：正文定格在生成那一刻，版式区实时重算——两者不同源就会出现
+  // 「正文讲旧配置、数据卡是新值」。逐段比对，只报实际变化的上游段。
+  const currentBasis = useMemo(
+    () =>
+      reportBasisOf({
+        project: { inputs: projectInputs },
+        diagnosis: { inputs: diagnosisInputs, diagnosis: diagnosisResult },
+        config,
+      }),
+    [projectInputs, diagnosisInputs, diagnosisResult, config],
+  )
+  const drift = useMemo(
+    () => (!isGenerating && hasReport ? basisDrift(reportBasis, currentBasis) : []),
+    [reportBasis, currentBasis, isGenerating, hasReport],
+  )
 
   // 流式期间贴底滚动（打字机可读性）
   useEffect(() => {
@@ -124,6 +145,8 @@ export default function AIReportPanel({ wide = false }) {
 
     setError(null)
     clearReport()
+    // 签名取「点击生成那一刻」的 store 快照（与正文同源），clearReport 会清空它，故置于其后
+    setReportBasis(reportBasisOf({ project, diagnosis, config }))
     setGenerating(true)
 
     // Key 未填：不发起请求，直接降级（CLAUDE.md §7 三态之一）
@@ -276,6 +299,15 @@ export default function AIReportPanel({ wide = false }) {
           {isGenerating && !hasReport && thinking && (
             <p className="no-print mt-2 text-[12px] italic text-paper-mute">
               模型思考中…（已分析 {thinking.length} 字）
+            </p>
+          )}
+
+          {/* 上游漂移提示：报告已生成后又改了上游（组合/诊断/系数）——正文不会自动
+              跟着变，如实告知并指向「重新生成」，不静默呈现不一致的报告 */}
+          {drift.length > 0 && (
+            <p className="no-print mt-2 text-[13px] leading-relaxed text-amber" role="status">
+              上游数据已变（{drift.join(' / ')}）：报告正文仍是生成时的旧数据，版式区已按新数据重算
+              ——请点上方「重新生成」保持一致
             </p>
           )}
 

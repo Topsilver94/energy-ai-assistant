@@ -2,7 +2,7 @@
  * 方案配置推荐引擎（模块①）—— 确定性规则推导，非 AI 生成（同 phasing.js 定位）。
  *
  * 职责：依据诊断输入（建筑性质/类型/面积/省份）给四类系统打分排序，
- * 输出 level / 触发依据 / 建议规模 / 置信度；财务预估值调 calculateFeasibility
+ * 输出 level / 触发依据 / 建议规模；财务预估值调 calculateFeasibility
  * 单系统测算——数字来自自家计算器，可完整溯源（热力图财务列即此数据）。
  *
  * 纪律：
@@ -10,7 +10,8 @@
  *     data/recommendationRules.js（均带 source）；打分权重（如基线 40/72）为引擎
  *     内部逻辑常数，决定相对排序而非财务结果
  *   - 每条推荐必须附触发依据（可解释性即可信度）
- *   - 推断不动的维度如实降级（充电桩车位未知 → confidence 'verify'）
+ *   - 推断不动的维度在触发依据里如实写明、不冒充实测（车位未知 → 类型代理配建推断，
+ *     并提示需车位/车流资料复核）
  *   - 储能定容双口径（负荷消纳 × 变压器接入）取短板，新建按光储配比兜底；
  *     理由列明口径与推定值，不冒充实测结论
  */
@@ -101,7 +102,7 @@ const estimateOf = (key, scale, province, config, demand) => {
  *            province: string, roofType?: string, year?: number|string }} params
  * @param {object} config configStore 纯数值配置
  * @returns {Array<{ key, label, scaleUnit, score, level, reasons: string[], suggestedScale,
- *            confidence: 'high'|'medium'|'verify', estimate: object|null,
+ *            estimate: object|null,
  *            demand?: { baseKw, kva, annualKwh } }>} 按 score 降序（demand 仅储能项携带：需量推定快照）
  */
 export const buildRecommendations = (
@@ -261,12 +262,12 @@ export const buildRecommendations = (
   const coolingRatio = config.cooling.areaRatio[buildingType] ?? 1
   const coolingScale = round1((area * coolingRatio) / 1e4)
   const coolingKw = coolingDesignKw(coolingScale, buildingType, config)
-  // 工业厂房冷负荷以工艺发热为主，面积指标先天粗糙 → 置信度如实降级，待工艺资料复核
+  // 工业厂房冷负荷以工艺发热为主，面积指标先天粗糙 → 触发依据里如实写明待工艺资料复核
   const coolingVerify = buildingType === '工业厂房'
   // 客户侧全生命周期对比（客户视角签单钩子，确定性派生——见 coolingTcoNote 注释）
   const coolingTco = coolingFits ? coolingTcoNote(province, config) : null
 
-  // ── 充电桩：车位实填 → 政策配建实证（置信度 high）；留空 → 类型代理推断（如实降级 verify）。
+  // ── 充电桩：车位实填 → 政策配建实证；留空 → 类型代理推断（触发依据里如实写明需车位资料复核）。
   //    换算链与配建表同源：充电车位 = 车位数 × 配建比例（1 车位 1 枪）→ ÷2 枪 = 双枪整机桩数。
   //    配建比例：新建读分省政策档（有源省，公开抽屉可调），未收录省与既有建筑走全国底线 10%（规则表）──
   const GUNS_PER_PILE = 2 // 桩＝120kW 双枪一体整机，与 capexPerPile/dailyKwhPerPile 口径同源
@@ -307,7 +308,6 @@ export const buildRecommendations = (
       score: pvScore,
       level: levelOf(pvScore),
       suggestedScale: pvKw,
-      confidence: 'high',
       reasons: [
         roofSourceNote,
         `按 ${roofDensity} kW/㎡ 装机密度 → 建议约 ${pvKw} kW`,
@@ -329,7 +329,6 @@ export const buildRecommendations = (
       score: storageScore,
       level: levelOf(storageScore),
       suggestedScale: storageKwh,
-      confidence: 'medium',
       // 需量推定快照：随「填入模块②」传递，储能需量收益与报告注记用（无此快照时②独立测算不计）
       demand,
       reasons: [
@@ -357,7 +356,6 @@ export const buildRecommendations = (
       score: coolingScore,
       level: levelOf(coolingScore),
       suggestedScale: coolingScale,
-      confidence: coolingVerify ? 'verify' : 'high',
       reasons: [
         coolingFits
           ? `${buildingType}建筑冷负荷稳定，面积 ${area.toLocaleString()} ㎡ ≥ 经济门槛 ${coolingMin.toLocaleString()} ㎡`
@@ -387,7 +385,6 @@ export const buildRecommendations = (
       score: chargerScore,
       level: levelOf(chargerScore),
       suggestedScale: piles,
-      confidence: hasParking ? 'high' : 'verify',
       reasons: chargerReasons,
       estimate: estimateOf('charger', piles, province, config),
     },

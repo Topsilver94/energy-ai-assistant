@@ -20,6 +20,9 @@ export const useAiStore = create((set) => ({
   thinking: '',
   // 报告头徽章数据源：'ai'（模型流式）| 'local'（本地模板降级）| null（未生成）
   generationSource: null,
+  // 生成报告那一刻的上游签名（utils/report.js reportBasisOf）：正文定格、版式实时，
+  // 据此比对提示「上游已变、需重新生成」；随 clearReport 一同清空
+  reportBasis: null,
   logoDataUrl: '', // 公司 LOGO（内存态，同 apiKey 纪律：仅本次会话，刷新即清空，严禁持久化）
   error: null,
 
@@ -35,5 +38,7 @@ export const useAiStore = create((set) => ({
   appendReport: (chunk) => set((s) => ({ reportContent: s.reportContent + chunk })),
   appendThinking: (chunk) => set((s) => ({ thinking: s.thinking + chunk })),
   setError: (error) => set({ error }),
-  clearReport: () => set({ reportContent: '', generationSource: null, thinking: '' }),
+  setReportBasis: (reportBasis) => set({ reportBasis }),
+  clearReport: () =>
+    set({ reportContent: '', generationSource: null, thinking: '', reportBasis: null }),
 }))

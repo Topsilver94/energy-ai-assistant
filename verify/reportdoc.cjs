@@ -73,6 +73,33 @@ const BASE = process.env.BASE_URL || 'http://localhost:5173'
   check('无 undefined 泄漏', !text.includes('undefined'))
   check('无 React 渲染错误', errs.length === 0)
 
+  // ── 上游漂移守护（正文定格 vs 版式实时）──
+  // 1) 刚生成完：正文与上游同源，不得出现漂移提示
+  const driftText = () => page.locator('p[role="status"]').allInnerTexts()
+  check('刚生成完无「上游已变」提示（不误报）', (await driftText()).every((t) => !t.includes('上游数据已变')))
+
+  // 2) 改模块② 组合（储能 1000 → 1500 kWh）重测 → 回 STEP③ 应报「模块② 组合配置」
+  await step(() => page.locator('nav[aria-label="模块导航"] button:has-text("锁定收益")').click())
+  await page.locator('label:has-text("储能 规模") input').fill('1500')
+  await page.locator('button:has-text("开始测算")').click()
+  await page.locator('text=组合投资').first().waitFor({ timeout: 5000 })
+  await step(() => page.locator('nav[aria-label="模块导航"] button:has-text("订制方案")').click())
+  const drift1 = (await driftText()).find((t) => t.includes('上游数据已变')) ?? ''
+  check('改② 组合后提示漂移且点名「模块② 组合配置」', drift1.includes('模块② 组合配置'))
+  check('漂移提示同时说明正文旧、版式已重算', drift1.includes('正文') && drift1.includes('重算'))
+
+  // 3) 点「重新生成」→ 正文与上游重新同源 → 提示消失
+  // 先把鼠标移开左缘书签：鼠标停在工作模式书签上会触发其悬浮展开（既定行为），
+  // 展开态盖住卡片左缘，「重新生成」钮正好在其下——真人操作也是先移开再点
+  await page.mouse.move(640, 520)
+  await page.locator('button[title="重新生成"]').click()
+  await page.locator('.report-doc').waitFor({ timeout: 8000 })
+  await page.waitForTimeout(400)
+  check(
+    '重新生成后漂移提示消失（正文与上游重新同源）',
+    (await driftText()).every((t) => !t.includes('上游数据已变')),
+  )
+
   if (errs.length) console.log('ERR:\n' + errs.join('\n'))
   console.log(fails === 0 ? '=== 版式外壳核验通过 ===' : `=== ${fails} 项失败 ===`)
   await browser.close()

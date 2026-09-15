@@ -22,6 +22,37 @@ const selectedSystems = (systems) =>
   PROJECT_TYPES.filter((t) => systems[t.key]?.enabled && Number(systems[t.key].capacity) > 0)
 
 /**
+ * 报告底稿签名（上游一致性守护）——报告是「生成即成文」的产物：
+ * 正文（AI 流式 / 本地模板）在点「生成」那一刻定格，而报告版式区
+ * （数据卡 / 分项明细 / 敏感性 / 参数附表）直接订阅 store 实时重算。
+ * 上游一变，就会出现「正文讲旧配置、数据卡是新值」的错配。
+ * 故生成时按段记下签名，渲染时逐段比对，只报实际变化的那一段。
+ * 段划分对应报告真正消费的三处上游，无关字段（如未启用系统的规模）不进签名。
+ */
+const BASIS_SEGMENTS = [
+  { key: 'step2', label: '模块② 组合配置' },
+  { key: 'step1', label: '模块① 诊断输入' },
+  { key: 'params', label: '系数参数' },
+]
+
+export const reportBasisOf = ({ project, diagnosis, config }) => {
+  const inputs = project?.inputs ?? {}
+  const systems = inputs.systems ?? {}
+  const combo = selectedSystems(systems)
+    .map((t) => `${t.key}:${Number(systems[t.key].capacity)}`)
+    .join(',')
+  return {
+    step2: `${inputs.province ?? ''}|${combo}`,
+    step1: JSON.stringify(diagnosis ?? null),
+    params: JSON.stringify(config ?? null),
+  }
+}
+
+/** 变化的上游段标签（无基准 = 从未生成过 → 空数组，不误报） */
+export const basisDrift = (basis, current) =>
+  !basis || !current ? [] : BASIS_SEGMENTS.filter((s) => basis[s.key] !== current[s.key]).map((s) => s.label)
+
+/**
  * 按选中系统展开各系统最关键系数入快照表（可溯源性）。
  * 报告版式的「附：当次测算关键参数」表数据源，ReportDocument 渲染。
  */

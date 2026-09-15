@@ -9,13 +9,6 @@ const LEVEL_TONES = {
   暂缓: 'border-line bg-transparent text-paper-mute',
 }
 
-// 置信度：数据支撑强度的如实分级（title 悬浮说明依据）
-const CONFIDENCE = {
-  high: { label: '高', title: '面积/类型数据直接推导' },
-  medium: { label: '中', title: '方向可推，规模需负荷数据修正' },
-  verify: { label: '待确认', title: '类型代理推断，需车位/流量或工艺负荷资料确认' },
-}
-
 /**
  * 方案配置推荐列表（规则引擎输出，每条附触发依据）。
  * 「填入模块② 测算」为覆盖式操作，只写入 level 推荐/可考虑 的系统
@@ -42,7 +35,9 @@ export default function RecommendationList({ recs, onApply }) {
           >
             {/* 徽章与规模都是整体单位：窄列（演示模式）挤不下时整块换行，
                 不让系统名被压成两行——故 flex-wrap + 各段 nowrap，
-                规模块靠 ml-auto 在换行后仍贴右缘 */}
+                规模块靠 ml-auto 在换行后仍贴右缘。
+                不设置信度徽章：投资推荐程度由 level 徽章承载，而规模的数据支撑强度
+                已由下方触发依据逐条写明（「需工艺负荷资料复核」等），徽章是重复表达 */}
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
               <span className="tabular font-mono text-[13px] text-paper-mute">{i + 1}</span>
               <span className="whitespace-nowrap text-sm font-semibold text-paper">{rec.label}</span>
@@ -50,12 +45,6 @@ export default function RecommendationList({ recs, onApply }) {
                 className={`whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-semibold ${LEVEL_TONES[rec.level]}`}
               >
                 {rec.level}
-              </span>
-              <span
-                className="whitespace-nowrap rounded-full border border-line px-2 py-0.5 text-[11px] text-paper-mute"
-                title={CONFIDENCE[rec.confidence].title}
-              >
-                {CONFIDENCE[rec.confidence].label}
               </span>
               <span className="tabular ml-auto whitespace-nowrap font-mono text-[13px] text-paper">
                 建议规模 {rec.suggestedScale}
