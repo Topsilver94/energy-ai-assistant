@@ -125,9 +125,8 @@ export default function PlanCompare() {
   const activeProvince = feasibility?.province ?? projectInputs.province
   // 两处口径跨省则如实标出（①诊断省 ≠ 当前配置那次测算用的省）
   const crossProvince = Boolean(hasRecs && diagProvince && diagProvince !== activeProvince)
-  const noteLead = hasRecs
-    ? `各档规模取① 建议值，收益按① 诊断省份 ${diagProvince} 测算；合计档收益取各系统合并现金流，非各单项加权。`
-    : ''
+  const noteLead = hasRecs ? `各档规模取① 建议值，收益按① 诊断省份 ${diagProvince} 测算；` : ''
+  const noteTail = hasRecs ? '；合计档收益取各系统合并现金流，非各单项加权' : ''
 
   return (
     <div className="no-print mt-4">
@@ -216,10 +215,11 @@ export default function PlanCompare() {
         </table>
       </div>
 
-      {/* 口径说明：档位规模/收益的口径来源与省份；跨省（①诊断省 ≠ ②表单省）时转 amber 警示 */}
+      {/* 口径说明：句子顺序跟表格行序（单项 → 当前配置 → 合计）；跨省时转 amber 警示 */}
       <p className={`mt-1.5 text-[11px] leading-relaxed ${crossProvince ? 'text-amber' : 'text-paper-mute'}`}>
         {noteLead}当前配置为模块② 上次测算结果（省份 {activeProvince}）
-        {crossProvince && '——与其余档位跨省，仅可作量级参考'}。系统寿命不一，各档回收期宜与 IRR 同看
+        {crossProvince && '——与其余档位跨省，仅可作量级参考'}
+        {noteTail}。系统寿命不一，各档回收期宜与 IRR 同看
       </p>
     </div>
   )
