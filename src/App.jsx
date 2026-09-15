@@ -28,9 +28,20 @@ export default function App() {
   // 演示模式聚焦列（点击左缘书签后置位；null = 未跳转过，三列全貌无描边）。
   // 与 activeKey 分开：演示模式的定位不切页，也不该触发工作模式的「换页滚回顶部」
   const [demoFocus, setDemoFocus] = useState(null)
+  // 悬浮列（鼠标设备专属；移开即清空，不留常驻态）
+  const [demoHover, setDemoHover] = useState(null)
+  // 是否有真正的悬浮能力：触摸端不算——Chrome 会把 tap 当 sticky hover，
+  // 那里退化为「点过的书签常驻高亮」，是触摸端唯一的聚焦反馈
+  const [canHover] = useState(() => window.matchMedia('(hover: hover) and (pointer: fine)').matches)
   // 聚焦是纯视觉指示——ring 走 box-shadow，不改变任何盒尺寸（红线：不影响现有布局形式）；
   // 圆角随描边一起给，只为贴合 Card 的 rounded-lg 边缘
-  const focusRing = (key) => (demoFocus === key ? 'rounded-lg ring-2 ring-volt' : '')
+  const focusRing = (key) =>
+    (canHover ? demoHover : demoFocus) === key ? 'rounded-lg ring-2 ring-volt' : ''
+  // 三列共用的悬浮钩子：悬浮到哪列哪列亮（鼠标移开立即清空）
+  const hoverProps = (key) => ({
+    onMouseEnter: () => setDemoHover(key),
+    onMouseLeave: () => setDemoHover(null),
+  })
 
   // 工作模式分页清单（key 与 WorkNav STEPS 对齐；wide = 横向双栏布局）。
   // 顺序即售前主线「先诊断后开方」：①诊断（默认入口）→ ②测算 → ③方案；
@@ -79,7 +90,8 @@ export default function App() {
            行高始终由输入侧①② 的自然内容决定，报告在卡内滚动，不再把三列一起
            拉出长空白；<lg 堆叠与打印 Card 回文档流（print:static）
            每列 wrapper 挂 stepAnchorId 供左缘书签平滑定位；scroll-mt-20 预留常驻
-           顶栏高度，使列顶落在顶栏下方而非被压住（不占位：scroll-margin 不影响布局）*/
+           顶栏高度，使列顶落在顶栏下方而非被压住（不占位：scroll-margin 不影响布局）；
+           wrapper 同时是悬浮聚焦区（hoverProps），描边跟随鼠标 */
         <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8 print:px-0 print:py-0">
           <section className="no-print mb-6">
             <h2 className="text-2xl font-bold">挖掘痛点 · 锁定收益 · 订制方案，三步闭环</h2>
@@ -90,13 +102,25 @@ export default function App() {
           </section>
 
           <div className="grid gap-6 lg:grid-cols-[repeat(3,minmax(0,1fr))] print:block">
-            <div id={stepAnchorId('diag')} className={`min-w-0 scroll-mt-20 ${focusRing('diag')}`}>
+            <div
+              id={stepAnchorId('diag')}
+              className={`min-w-0 scroll-mt-20 ${focusRing('diag')}`}
+              {...hoverProps('diag')}
+            >
               <DiagnosisModule wide={false} />
             </div>
-            <div id={stepAnchorId('calc')} className={`min-w-0 scroll-mt-20 ${focusRing('calc')}`}>
+            <div
+              id={stepAnchorId('calc')}
+              className={`min-w-0 scroll-mt-20 ${focusRing('calc')}`}
+              {...hoverProps('calc')}
+            >
               <CalculatorModule wide={false} />
             </div>
-            <div id={stepAnchorId('report')} className={`relative min-w-0 scroll-mt-20 ${focusRing('report')}`}>
+            <div
+              id={stepAnchorId('report')}
+              className={`relative min-w-0 scroll-mt-20 ${focusRing('report')}`}
+              {...hoverProps('report')}
+            >
               <AIReportPanel wide={false} />
             </div>
           </div>

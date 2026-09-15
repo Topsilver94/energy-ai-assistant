@@ -222,9 +222,12 @@ export default function AIReportPanel({ wide = false }) {
         </div>
       )}
 
-      {/* 依赖齐备：生成按钮（最强 CTA 反色白底 pill） */}
+      {/* 依赖齐备：生成按钮（最强 CTA 反色白底 pill）。
+          框内**顶端对齐**而非垂直居中：演示模式卡片被拉伸到整行高（可达 2400px+），
+          居中会把 CTA 推到卡片中部——从书签跳 STEP③ 时正好落在首屏之外。
+          虚线框仍 flex-1 填满卡片，不留空洞 */}
       {ready && !hasReport && !isGenerating && (
-        <div className="no-print mt-5 flex flex-1 flex-col items-center justify-center rounded-lg border border-dashed border-line px-4 py-8">
+        <div className="no-print mt-5 flex flex-1 flex-col items-center rounded-lg border border-dashed border-line px-4 pb-8 pt-6">
           <Button variant="inverse" size="lg" onClick={handleGenerate}>
             <Rocket size={18} />
             生成方案报告

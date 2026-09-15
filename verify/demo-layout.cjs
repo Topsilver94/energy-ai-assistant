@@ -8,7 +8,11 @@
 //   ⑤ 两处分项明细表（模块② min-w-480 / 报告内 min-w-560）首列 sticky 固定
 //   ⑥ 台账快照：复制按钮 → 剪贴板 TSV（身份行 + 分项表 + 关键参数段）
 //   ⑦ 演示模式左缘定位书签：与工作模式书签互斥渲染、内容左右留白对称（书签不占位）、
-//     落点 = 该列顶部（顶栏下方）、STEP③ 报告内部滚动归零、聚焦描边唯一、不引入横向溢出
+//     落点 = 该列顶部（顶栏下方）、STEP③ 报告内部滚动归零、描边**悬浮跟随**（点击不留
+//     常驻态，鼠标设备）、不引入横向溢出
+//   ⑧ 演示窄列下推荐卡标题单行不折行（行数按实测行高换算，非固定像素）
+//   ⑨ 空态跳转 STEP③ 后「生成方案报告」CTA 落在首屏内（演示卡片被拉伸到整行高，
+//     居中会把 CTA 推到卡片中部）
 // 依赖 dev server（默认 5173，DEMO_LAYOUT_URL 可覆盖）已启动
 const path = require('path')
 const fs = require('fs')
@@ -237,10 +241,55 @@ const check = (name, ok, detail) => {
     `列顶距视口 ${step3.gap}px（scroll-margin ${step3.smt} / 顶栏 ${step3.headerH}px）`)
   check('⑦d 跳转 STEP③ 报告内部滚动归零', before3 > 0 && step3.reportScroll === 0,
     `内部 scrollTop ${before3} → ${step3.reportScroll}`)
-  check('⑦e 仅聚焦列有亮绿描边（高亮唯一）',
-    step3.rings[2].includes(VOLT) && step3.rings[0] === 'none' && step3.rings[1] === 'none',
-    step3.rings.map((s) => (s === 'none' ? '无' : s.includes(VOLT) ? 'volt' : s)).join(' / '))
-  check('⑦f 书签不引入横向溢出', step3.hOverflow <= 1, `溢出 ${step3.hOverflow}px`)
+  const rings = () =>
+    page.evaluate(() =>
+      ['diag', 'calc', 'report'].map(
+        (k) => getComputedStyle(document.getElementById(`demo-step-${k}`)).boxShadow,
+      ),
+    )
+  const fmt = (rs) => rs.map((s) => (s === 'none' ? '无' : s.includes(VOLT) ? 'volt' : s)).join(' / ')
+  // 描边规则：鼠标设备=悬浮跟随（点击不留常驻态）；触摸端=点过的书签常驻（见 mobile-check）
+  check('⑦e 点击书签不留常驻描边（高亮改为悬浮跟随）', step3.rings.every((s) => s === 'none'),
+    fmt(step3.rings) + '（鼠标仍停在书签上，未悬停任何列）')
+  // 悬停到 ② 列可见区域（用 DOM 算点，不写死坐标）：只有该列亮
+  const hoverPt = await page.evaluate(() => {
+    const r = document.getElementById('demo-step-calc').getBoundingClientRect()
+    return { x: Math.round(r.left + r.width / 2), y: Math.round(Math.max(r.top, 0) + 40) }
+  })
+  await page.mouse.move(hoverPt.x, hoverPt.y)
+  await page.waitForTimeout(120)
+  const hovered = await rings()
+  check('⑦f 悬浮列亮描边且唯一',
+    hovered[1].includes(VOLT) && hovered[0] === 'none' && hovered[2] === 'none', fmt(hovered))
+  const overlap = await page.evaluate(() => {
+    const r = document.getElementById('demo-step-report').getBoundingClientRect()
+    return { x: Math.round(r.left + r.width / 2), y: Math.round(Math.max(r.top, 0) + 40) }
+  })
+  await page.mouse.move(overlap.x, overlap.y)
+  await page.waitForTimeout(120)
+  const hovered2 = await rings()
+  check('⑦g 描边随鼠标换列（前一次悬停自动熄灭）',
+    hovered2[2].includes(VOLT) && hovered2[1] === 'none' && hovered2[0] === 'none', fmt(hovered2))
+  await page.mouse.move(4, 4) // 移到左缘空白（不在任何列内）
+  await page.waitForTimeout(120)
+  check('⑦h 移开鼠标描边消失', (await rings()).every((s) => s === 'none'), fmt(await rings()))
+  check('⑦i 书签不引入横向溢出', step3.hOverflow <= 1, `溢出 ${step3.hOverflow}px`)
+
+  // ── ⑧ 演示窄列：推荐卡标题单行不折行（行数 = 高 ÷ 行高，非固定像素）──
+  const reco = await page.evaluate(() => {
+    const head = [...document.querySelectorAll('p')].find(
+      (p) => p.textContent.trim() === '方案配置推荐',
+    )
+    const root = head?.parentElement?.parentElement // 标题行 → 列表容器
+    const el = root && [...root.querySelectorAll('span')].find((s) => s.textContent.trim() === '分布式光伏')
+    if (!el) return null
+    return {
+      lines: Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)),
+      h: Math.round(el.getBoundingClientRect().height),
+    }
+  })
+  check('⑧ 推荐卡标题单行（演示窄列不折行）', reco != null && reco.lines === 1,
+    reco ? `${reco.lines} 行（高 ${reco.h}px）` : '未找到推荐标题')
 
   await page.evaluate(() => window.scrollTo({ top: 0 }))
   await page.waitForTimeout(200)
@@ -254,6 +303,49 @@ const check = (name, ok, detail) => {
   })
   check('<lg 堆叠态报告区不塌陷', stackedH != null && stackedH >= 400, `${stackedH}px`)
   await page.screenshot({ path: `${OUT}/demo-stacked.png` })
+
+  // ── ⑨ 空态跳转 STEP③：「生成方案报告」CTA 须落在首屏内 ──
+  // 本页报告已生成（CTA 分支不存在），故另起一页只走空态：①② 就绪但不生成报告
+  const p2 = await context.newPage()
+  const errs2 = []
+  p2.on('pageerror', (e) => errs2.push(String(e)))
+  await p2.goto(URL, { waitUntil: 'networkidle' })
+  await p2.locator('input[placeholder="如 10000"]').fill('20000')
+  await p2.locator('input[placeholder^="留空按典型强度"]').fill('200')
+  await p2.locator('button:has-text("开始诊断")').click()
+  await p2.locator('text=节能潜力').first().waitFor({ timeout: 8000 })
+  await p2.locator('button:has-text("填入模块② 测算")').first().click()
+  await p2.waitForTimeout(400)
+  await p2.locator('button:has-text("开始测算")').click()
+  await p2.locator('text=组合投资').first().waitFor({ timeout: 8000 })
+  await p2.locator('button[aria-pressed]:has-text("演示模式")').click()
+  await p2.locator('text=三步闭环').waitFor({ timeout: 5000 })
+  await p2.waitForTimeout(400)
+  await p2.locator('nav[aria-label="模块定位导航"] button[aria-label^="03"]').click()
+  await p2
+    .waitForFunction(
+      () => {
+        const w = document.getElementById('demo-step-report')
+        return (
+          Math.abs(w.getBoundingClientRect().top - parseFloat(getComputedStyle(w).scrollMarginTop)) < 3
+        )
+      },
+      { timeout: 6000 },
+    )
+    .catch(() => {})
+  const cta = await p2.evaluate(() => {
+    const btn = [...document.querySelectorAll('button')].find((b) =>
+      b.textContent.includes('生成方案报告'),
+    )
+    if (!btn) return null
+    const r = btn.getBoundingClientRect()
+    return { top: Math.round(r.top), bottom: Math.round(r.bottom), vh: window.innerHeight }
+  })
+  check('⑨ 跳转 STEP③ 后生成按钮在首屏内（无需滚动）',
+    cta != null && cta.top >= 0 && cta.bottom <= cta.vh,
+    cta ? `按钮 ${cta.top}–${cta.bottom}px / 视口高 ${cta.vh}px` : '未找到生成按钮')
+  check('⑨b 空态页无渲染错误', errs2.length === 0, errs2[0] || '')
+  await p2.close()
 
   check('无渲染错误', errs.length === 0, errs[0] || '')
   await browser.close()

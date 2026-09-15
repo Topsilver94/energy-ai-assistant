@@ -4,7 +4,8 @@
 //   ③ 省份索引栏（模块①② 同构）可点开、字母索引条/选项可用
 //   ④ 本地模板生成后「导出 PDF」在手机环境给出引导反馈（不再「点了没反应」）
 //   外加：演示模式（≥1024 三列 / 窄屏单列）内容不超出右缘、三列等宽、
-// 左缘定位书签收起态落在左留白内不遮信息、点击后落到该列顶部（顶栏不压住）。
+// 左缘定位书签收起态落在左留白内不遮信息、点击后落到该列顶部（顶栏不压住）、
+// 触摸端点书签后该列常驻亮绿描边（无 hover 设备时的聚焦反馈）。
 // 依赖：dev server 运行中（默认 :5175，可 BASE_URL 覆盖）；本地模板降级，无需 API Key。
 const { chromium } = require('playwright')
 const fs = require('fs')
@@ -222,6 +223,18 @@ const measureHScroll = (page, sel) =>
         `，报告内部滚动 ${land.scrollTop}px`,
     )
   if (land.overflow > 1) fail(`书签跳转后横向溢出 ${land.overflow}px`)
+  // 触摸端没有真悬浮（Chrome 把 tap 当 sticky hover），故描边规则退化为
+  // 「点过的书签常驻高亮」——这是触摸端唯一的聚焦反馈，须亮在该列上
+  const touchRing = await page.evaluate(() => {
+    const ringOf = (k) => getComputedStyle(document.getElementById(`demo-step-${k}`)).boxShadow
+    return { diag: ringOf('diag'), calc: ringOf('calc'), report: ringOf('report') }
+  })
+  const isVolt = (s) => s.includes('30, 215, 96')
+  if (!isVolt(touchRing.report) || isVolt(touchRing.diag) || isVolt(touchRing.calc))
+    fail(
+      `触摸端描边应只在点过的列上（诊断 ${touchRing.diag} / 测算 ${touchRing.calc} / 方案 ${touchRing.report}）`,
+    )
+  else note('触摸端点书签后该列常驻亮绿描边（无 hover 时的聚焦反馈）')
   await page.screenshot({ path: path.join(shotDir, 'mobile-4-demo.png'), fullPage: true })
   await page.evaluate(() => window.scrollTo({ top: 0 }))
   await page.waitForTimeout(200)
