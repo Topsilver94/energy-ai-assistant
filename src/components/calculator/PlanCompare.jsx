@@ -14,7 +14,8 @@ import { LEVEL_TONES } from '../diagnosis/RecommendationList'
  * - 单项档：模块① 推荐列表里的每一项（含谨慎/暂缓），按其建议规模单独测算
  * - 当前配置档：直接复用已展示的组合总账（与上方数据卡同源），不重算，避免同一份配置
  *   在两处出现两个数；紧跟单项档，是用户此刻手上那份账。构成与省份都取那次测算的快照，
- *   表单改了未重测时不跟着变（旧数字不挂新规模/新省份）
+ *   表单改了未重测时不跟着变（旧数字不挂新规模/新省份），改在该行挂 amber「表单已改 ·
+ *   重测后刷新」——提示长在数字旁边，不藏在脚注里
  * - 合计档：上述各项按建议规模全上，IRR/回收期取各系统合并现金流；假想参照，置于末位
  *
  * 为什么档位不带优先级、不设 Δ 列、不做优劣着色：模块① 的 score 是四把不同量纲
@@ -59,16 +60,38 @@ export default function PlanCompare() {
   // 与模块① 结果区同一入口、同一 config ⇒ 档位与 STEP1 推荐列表逐字一致（无需入 store）
   const recs = useMemo(() => recommendFromDiagnosis(diagnosis, config), [diagnosis, config])
 
+  // 构成比对的两侧：都已「键 + 数值规模」表形——表单侧是字符串（用户可能敲 '2000.0'），
+  // 测算结果侧是数（2000），按字符串比会把等值判成「已改」，提示会一直挂着
+  const measuredSide = useMemo(
+    () => (feasibility?.items ?? []).map((it) => ({ key: it.type, capacity: it.capacity })),
+    [feasibility],
+  )
+  const formSide = useMemo(
+    () =>
+      PROJECT_TYPES.filter(
+        (t) => projectInputs.systems[t.key]?.enabled && Number(projectInputs.systems[t.key].capacity) > 0,
+      ).map((t) => ({ key: t.key, capacity: Number(projectInputs.systems[t.key].capacity) })),
+    [projectInputs],
+  )
+  const sameSide = (a, b) =>
+    a.length === b.length && a.every((x, i) => x.key === b[i].key && x.capacity === b[i].capacity)
+
   // 当前配置的构成：取自「那次测算」的分项快照（feasibility.items），不是表单现值。
   // 该行的数字就是那次测算的，构成必须同源——否则表单改了规模还没重测时，会把新规模
   // 挂到旧数字上（省份已同样处理：口径行标的是 feasibility.province）。
   // 一系统一行：拼成一行时三四个系统会把「档位」列撑到最宽，短名+多行更省横向空间
   const activeParts = useMemo(() => {
-    const byType = new Map((feasibility?.items ?? []).map((it) => [it.type, it.capacity]))
+    const byType = new Map(measuredSide.map((m) => [m.key, m.capacity]))
     return PROJECT_TYPES.filter((t) => byType.has(t.key)).map(
       (t) => `${SHORT[t.key]} ${byType.get(t.key)}${t.scaleUnit}`,
     )
-  }, [feasibility])
+  }, [measuredSide])
+
+  // 表单侧与那次测算不一致（规模改了 / 省份改了，都没重测）→ 这一行落后于表单，
+  // 在其数字旁如实挂提示。藏在口径行里不够近——用户看的是这张表
+  const pendingEdit =
+    Boolean(feasibility) &&
+    (!sameSide(measuredSide, formSide) || projectInputs.province !== feasibility.province)
 
   const rows = useMemo(() => {
     const out = recs.map((rec) => ({
@@ -83,7 +106,14 @@ export default function PlanCompare() {
     // 当前配置档：复用 store 里已展示的测算结果（须已测算且有有效系统）。
     // 置于单项档之后、合计档之前——再往下是假想的「全上」
     if (feasibility && activeParts.length > 0) {
-      out.push({ id: '__active', name: '当前配置', sub: activeParts, total: true, useStoreResult: true })
+      out.push({
+        id: '__active',
+        name: '当前配置',
+        sub: activeParts,
+        pending: pendingEdit,
+        total: true,
+        useStoreResult: true,
+      })
     }
     // 合计档：仅一项时与单项档重复，不出
     if (recs.length > 1) {
@@ -98,7 +128,7 @@ export default function PlanCompare() {
       })
     }
     return out
-  }, [recs, feasibility, activeParts])
+  }, [recs, feasibility, activeParts, pendingEdit])
 
   // 各档测算：单项/合计档按① 诊断省份（与① 热力图同口径），当前配置档直取 store 结果
   const accounts = useMemo(() => {
@@ -180,10 +210,15 @@ export default function PlanCompare() {
                     {row.sub && (
                       <span className="mt-0.5 block font-mono text-[10px] font-normal leading-snug text-paper-mute">
                         {row.sub.map((line) => (
-                          <span key={line} className="block">
+                          <span key={line} className="plan-line block">
                             {line}
                           </span>
                         ))}
+                      </span>
+                    )}
+                    {row.pending && (
+                      <span className="plan-stale mt-0.5 block font-mono text-[10px] font-normal text-amber">
+                        表单已改 · 重测后刷新
                       </span>
                     )}
                   </td>

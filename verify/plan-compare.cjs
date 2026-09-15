@@ -9,7 +9,8 @@
 //   ⑧ 口径说明行如实写出①诊断省份；首列 sticky（同其他数据表纪律）
 //   ⑨ 省份随「填入模块②」携带：携带后② 按新省份重算（不报跨省）；未重测时改表单省份
 //      不改口径行归属（数字是哪次测的就标哪个省）；重测后如实报两处口径跨省
-//   ⑩ 当前配置构成逐行渲染（行数 = 已启用系统数），不拼成一行撑宽「档位」列
+//   ⑩ 当前配置构成逐行渲染（行数 = 已启用系统数），不拼成一行撑宽「档位」列；
+//      表单（规模/省份）改了未重测时该行挂「表单已改 · 重测后刷新」，重测后消失
 // 依赖 dev server（默认 5173，PLAN_COMPARE_URL 可覆盖）已启动
 const path = require('path')
 const fs = require('fs')
@@ -52,10 +53,13 @@ const readTable = (page) =>
     const rows = [...t.querySelectorAll('tbody tr')].map((tr) => {
       const cells = [...tr.children]
       const lines = cells[0].innerText.split('\n').map((s) => s.trim())
+      // 构成行（.plan-line）与「表单已改」提示（.plan-stale）都渲染在首列，各取各的
+      const subs = [...cells[0].querySelectorAll('.plan-line')].map((s) => s.textContent.trim())
       return {
         name: lines[0],
-        sub: lines[1] ?? null,
-        subs: lines.slice(1), // 构成逐行渲染（一系统一行）——行数即系统数
+        sub: subs[0] ?? null,
+        subs,
+        pending: Boolean(cells[0].querySelector('.plan-stale')),
         level: cells[1].textContent.trim(),
         cells: cells.slice(2).map((td) => td.textContent.trim()),
       }
@@ -272,6 +276,11 @@ const readCards = (page) =>
       !actRow.subs.some((l) => l.includes('+')),
     `${actRow?.subs.length ?? 0} 行 vs 启用 ${enabled} 项：${(actRow?.subs ?? []).join(' / ')}`,
   )
+  check(
+    '⑩b 表单与那次测算一致时不挂「表单已改」提示',
+    actRow?.pending === false,
+    actRow?.pending ? '多挂了提示' : '',
+  )
 
   // ⑨c 未重测时改表单省份，口径行不得跟着表单走：数字是安徽那次测的，就不能说成广东的
   await page.locator('button[aria-haspopup="listbox"]').first().click()
@@ -279,10 +288,11 @@ const readCards = (page) =>
   await page.locator('[role="option"]:has-text("广东")').click()
   await page.waitForTimeout(300)
   const noteStale = await readNote(page)
+  const rowStale = (await readTable(page))?.rows.find((r) => r.name === '当前配置')
   check(
-    '⑨c 改表单省份未重测：口径行仍标上次测算的省份（安徽）',
-    noteStale.includes('安徽') && !noteStale.includes('广东'),
-    noteStale.replace(/\s+/g, ' ').slice(-46),
+    '⑨c 改表单省份未重测：口径行仍标安徽，且该行挂「表单已改 · 重测后刷新」',
+    noteStale.includes('安徽') && !noteStale.includes('广东') && rowStale?.pending === true,
+    `${noteStale.replace(/\s+/g, ' ').slice(-30)} / 待重测提示=${rowStale?.pending}`,
   )
 
   // ⑨d 重测后口径行转报广东，并如实提示与① 诊断省份（安徽）跨省——两种口径并存
@@ -290,10 +300,11 @@ const readCards = (page) =>
   await page.locator('form button[type="submit"]:not([disabled])').waitFor({ timeout: 10000 })
   await page.waitForTimeout(300)
   const note2 = await readNote(page)
+  const rowFresh = (await readTable(page))?.rows.find((r) => r.name === '当前配置')
   check(
-    '⑨d 重测后转报广东并如实报跨省（① 诊断仍是安徽）',
-    note2.includes('广东') && note2.includes('跨省'),
-    note2.replace(/\s+/g, ' ').slice(-46),
+    '⑨d 重测后转报广东并如实报跨省（① 诊断仍是安徽），待重测提示消失',
+    note2.includes('广东') && note2.includes('跨省') && rowFresh?.pending === false,
+    `${note2.replace(/\s+/g, ' ').slice(-30)} / 待重测提示=${rowFresh?.pending}`,
   )
 
   check('无渲染错误', errs.length === 0, errs[0] || '')
