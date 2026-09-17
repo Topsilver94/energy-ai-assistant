@@ -9,6 +9,8 @@
 //   ⑤ 移除回退：删曲线重诊 → 年电量回到电费反推 666.7 万kWh，口径卡消失
 //   ⑥ 新建隐藏：切换新建建筑后上传位不渲染
 //   ⑦ 无效文件：仅 5 个数值点 → amber 报错且不落摘要
+//   ⑧ 上传说明文案契约：须写明「时间 + 功率」两列 / 单位 kW / 功率放末列——解析器
+//     取行末可解析数值且不读单位，这两条边界不写在客户第一眼处就会静默算错
 // 依赖 dev server（默认 5173，LOAD_CURVE_URL 可覆盖）已启动
 const path = require('path')
 const fs = require('fs')
@@ -140,6 +142,7 @@ const makeCurveCsv = () => {
 
   // ── 无效文件：5 个数值点 → 报错不落摘要 ──
   await page.locator('button:has-text("既有建筑")').click()
+  await page.waitForTimeout(200)
   await fileInput.setInputFiles({
     name: 'bad.csv',
     mimeType: 'text/csv',
@@ -154,6 +157,17 @@ const makeCurveCsv = () => {
     '⑦ 无效文件 amber 报错且不落摘要',
     afterBad.includes('有效功率点仅 5 个') && !afterBad.includes('曲线实测口径已启用'),
     '不足一天阈值拦截',
+  )
+
+  // ── ⑧ 上传位文案的两条格式硬约束（解析器取行末数值 / 不读单位）──
+  //    这两条只在代码里、界面上不说客户就会踩：功率后又挂电压/电流列会取错列，
+  //    单位写 W 或 MW 差 1000 倍且照样算下去，故文案必须写明。
+  const hintBox = page.locator('p:has-text("逐 15 分钟功率表")').first()
+  const hint = (await hintBox.count()) > 0 ? (await hintBox.innerText()).replace(/\s+/g, ' ') : ''
+  check(
+    '⑧ 上传说明写明「两列 + 单位 kW + 功率放末列」',
+    hint.includes('两列') && hint.includes('kW') && hint.includes('末列'),
+    hint.slice(0, 56) || '未找到上传说明',
   )
 
   check('无渲染错误', errs.length === 0, errs[0] || '')

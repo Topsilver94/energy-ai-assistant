@@ -65,8 +65,12 @@ export default function LoadCurveInput() {
             }}
           />
         </label>
+        {/* 文案里的两个格式约束是解析器的真实边界，不是提示性套话：取每行「末个可解析数值」
+            为功率 ⇒ 功率后还有电压/电流列会取错；解析器不读单位 ⇒ 列里写 W 或 MW 会差 1000
+            倍且照样算下去。两列式最稳，写在客户第一眼看到的地方（load-curve 守护 ⑧ 盯着） */}
         <p className="mt-1.5 text-[12px] leading-relaxed text-paper-mute">
-          全年逐时 / 逐 15 分钟功率表：年电量转实测口径，储能定容与需量按曲线最大值，比电费反推更准。
+          全年逐时 / 逐 15 分钟功率表，只留「时间 + 功率」两列（单位 kW，功率放末列最稳）：年电量转实测口径，
+          储能定容与需量按曲线最大值。
         </p>
         {error && (
           <p className="mt-1 text-[12px] leading-relaxed text-amber" role="alert">
