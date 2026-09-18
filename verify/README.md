@@ -22,6 +22,8 @@ Playwright 驱动真实页面（headless Chromium），对三大模块与配置�
 | `print-check.cjs` | 模块③ 打印版式（本地降级路径）：生成方案 → `@media print` 断言正式报告样式（白底黑字、隐藏导航与参数面板）+ 产出 A4 PDF |
 | `readme-shots.cjs` | README 截图再生成（1440×900 @2x retina，演示数据就绪态）→ `docs/screenshots/`；界面布局变更后重跑 |
 | `blank-check.cjs` | 白屏诊断工具（非断言）：加载页面收集 console / pageerror / 请求失败 / 根节点渲染情况——整页空白时先用它定责，不靠猜 |
+| `anchors.mjs` | 离线数值锚点（常规套件成员；纯 Node ESM 直 import `src/` 计算层，全仓首个不读 DOM 文本的数值验证——`package.json` `"type":"module"` 使 `src/utils`、`src/data` 可直接 import）：A0 系数指纹（defaultConfig+recommendationRules 叶子路径结构指纹 + 锚点所用默认值数值钉；provinces 数值整体不钉——峰谷价差按月换版只改数值不动结构，换版不红、动结构必红）→ A1 IRR 闭式解【强】（合成 `lifetimeYears` 1/2/100 造单期/两期求根/永续极限三个代数精确解，与代码的二分迭代是两条路径；\|Δ\|≤1e-4 = 二分容差量级，1e-6 形 100% 误报）→ A2 单位哨兵【强】（系数设 10 的幂，走查 kW→W ×1000、万㎡→㎡ ×1e4、元→万元 ÷1e4、kWh→MWh ÷1000 整条换算链，精确 ===）→ A3 手推算术【中】（四系统分项 + 两系统合计按 CLAUDE.md §5 公式与默认值手推期望，与 m1 人工基线 820 万/22.2%/4.3 年互证）→ A4 需量锚点（315 kVA 门槛 / 月每 kVA 恰 260 → 九折价 27 无浮点漂移 / 削峰封顶 100/199/200/201/400 五点）→ A5 解析与档位边界（恒定·锯齿·96 点均值曲线的闭式反解 + 年电量按未舍入均值而 avgKw 是 1 位小数舍入值的陷阱钉、评级阈值压线 ±ε 探针、供冷面积档与新建充电桩档压线） |
+| `numeric-audit.mjs` | 一次性数值网格审计（诊断件，不进 CI 主链路——同 `heatmap-layout.cjs` 定位；同样纯 Node ESM 离线跑）：6 省 × 4 系统规模档 × 3 需量（含 314/315 门槛两侧）+ 5 组合 = 324 组合，扫 11 类结构不变量——config 不可变 / 守恒律（重言式护栏，防合计口径将来改道）/ IRR 符号夹逼（NPV(irr∓2e-4) 异号，量纲无关）/ 单系统 total===item 逐位 / 线性齐次 ×2 逐位（乘 2 是 2 的幂，浮点严格成立）/ 需量分段封顶 / 敏感性接线（平坦轴集合 + 电价轴方向——抓扰动打错字段）/ NaN 泄漏（含逐个删可选系数走兜底路径）/ recommend→finance 联动（推荐卡 estimate 与直算逐位相等，跨模块单位串位唯一抓手）/ horizon 截断（合并流长度 = 最长寿命，且全寿命年金口径 NPV(irr) 明显 ≠0——后半句防止断言为空）/ 入参边界（形状异常抛错、无可测算返回 null）；**6 条已实测疑点钉成现状断言**（合计回收期用全寿命年净而 IRR 按寿命截断、IRR 为正却敏感性不适用、IRR 可为负、未收录省静默回退北京、既有建筑误挂「新建无负荷数据」文案、暂缓档默认系数不可达）——钉住 ≠ 认可，修复属口径轮：改后本节会红，红 = 行为已变需同步；文末另有模块默认值快照自检（脚本改系数必须深拷贝，浅拷贝写穿共享引用会让后续段落全成脏数——初版实测栽过：删广东 cyclesPerDay 让疑点① 打出 21.2% 脏数） |
 
 ## 运行
 
@@ -37,6 +39,11 @@ NODE_PATH="C:/Users/hp/AppData/Local/npm-cache/_npx/e41f203b7505f1fb/node_module
 
 # m4 需要真实 Key：把 Key 粘贴到 verify/aikey.txt 首行（文件已 gitignore），再直接跑
 NODE_PATH=... node verify/m4.cjs   # 也可用 GLM_KEY 环境变量注入，二选一
+
+# anchors.mjs / numeric-audit.mjs 例外：纯 Node ESM 直 import src/ 计算层，
+# 不需要 dev server，也不需要 NODE_PATH（package.json "type":"module"）
+node verify/anchors.mjs
+node verify/numeric-audit.mjs
 ```
 
 产出：`verify/out/*.json`（提取数值+控制台报错）、`verify/shots/*.png`（各阶段截图）。
@@ -47,4 +54,5 @@ NODE_PATH=... node verify/m4.cjs   # 也可用 GLM_KEY 环境变量注入，二�
 - 脚本退出码非 0 = 存在 console/page 错误或断言失败
 - `out/*.json` 中的 `extracted` 字段用于人工比对预期值（README 表内即基准）
 - 系数默认值改动会使历史基准失效，改 `data/coefficients.js` 后需同步更新本 README 的对照值
+- **期望值的独立性分级（`anchors.mjs` 起引入，混着讲就会自欺）**：多数既有守护的期望值由被测代码同一公式反解（自洽——防回归有效，证正确无力；储能「容量×365 满充满放」高估约 20% 的真实事故发生时它们全绿）。锚点按证明力分三级：**强** = 闭式解（合成 config 造代数可解情形）+ 单位哨兵（系数设 10 的幂走查换算链），能证「代码实现错」；**中** = 按 CLAUDE.md §5 公式手推算术，只能证「实现相对文档漂移」；**观察** = `numeric-audit.mjs` 的网格扫描与疑点钉现状，是发现不是验证。锚点证明不了「文档公式/系数默认值贴合现实」——那要靠参数级外部锚定（分省利用小时对国家能源局、电价对省发改委、造价对 EPC 中标公告，另行开工）
 - `m3-ai.cjs` 是 DeepSeek 时代留下的旧脚本（需 `DEEPSEEK_API_KEY` + 模型 `deepseek-v4-flash`）：`verify/aikey.txt` 现放的是 GLM Key，跑它必然在「AI 徽章」一条失败并回落本地模板（其余断言仍过）——**这是环境缺 Key，不是回归**，已用 `git stash` 基线核过。真实 AI 链路回归走 `m4.cjs`

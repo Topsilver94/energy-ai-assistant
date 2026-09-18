@@ -42,4 +42,15 @@ export default [
       globals: { ...globals.node, ...globals.browser },
     },
   },
+
+  // 纯 Node ESM 数值审计（anchors / numeric-audit）：直接 import src/ 计算层，
+  // 无浏览器侧代码，只注入 node globals（process/console）
+  {
+    files: ['verify/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: { ...globals.node },
+    },
+  },
 ]
