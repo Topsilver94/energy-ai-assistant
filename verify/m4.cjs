@@ -101,9 +101,9 @@ const log = (m) => {
     typewriter: lens.length >= 3 && new Set(lens).size >= 3, // 长度多次变化 = 真流式
     fiveSections: ['项目概述', '财务分析', '技术路径', '建设节奏', '预期收益'].every((s) => rt.includes(s)),
     numbersKept: {
-      invest820: rt.includes('820'),
-      irr222: rt.includes('22.2'),
-      payback43: rt.includes('4.3'),
+      invest685: rt.includes('685'),
+      irr273: rt.includes('27.3'),
+      payback36: rt.includes('3.6'),
       carbon1239: rt.includes('1239.2') || rt.includes('1239'),
     },
     phasingKept: rt.includes('一期') || rt.includes('一次性建成'),

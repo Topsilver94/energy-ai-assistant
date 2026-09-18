@@ -13,7 +13,7 @@ import { benchmarkTypes } from './benchmarks.js'
 export const defaultConfig = {
   // 光伏（规模单位：kW，备案/并网/EPC 报价通行功率口径）
   pv: {
-    capexPerWatt: 3.5, // 元/W，工商业分布式初始投资
+    capexPerWatt: 3.0, // 元/W，工商业分布式初始投资
     performanceRatio: 0.9, // 系统效率 PR（灰尘/线损/逆变器损耗）
     omRatioPerYear: 0.01, // 年运维费占初始投资比例
     lifetimeYears: 25, // 计算期，组件功率质保 25 年
@@ -21,7 +21,7 @@ export const defaultConfig = {
   // 储能（规模单位：kWh，工商业储能柜通行能量口径）；套利收益按分省峰谷价差 × 分时循环折算
   //（价差与循环判定均为公开数据项：provinces.X.peakValleySpread / cyclesPerDay，不在全局写死循环次数）
   storage: {
-    capexPerKWh: 1200, // 元/kWh，即 1.2 元/Wh
+    capexPerKWh: 850, // 元/kWh，即 0.85 元/Wh
     cycle2SpreadRatio: 0.5, // 两充两放省第二循环有效价差占全额峰谷价差比例（平充峰放：峰−平 ≈ 半额）
     roundTripEfficiency: 0.88, // AC-AC 综合效率（充放电双向损耗，套利充电量按 1/η 反推）
     depthOfDischarge: 0.9, // 可用放电深度（额定容量 × DoD = 单次可放电量）
@@ -151,11 +151,14 @@ export const defaultConfig = {
 }
 
 // ── 数据日期常量（年更编辑点：峰谷价差换月只改 SPREAD_AS_OF、分省电价换年只改 ELECP_AS_OF、
+//    系统造价换版只改 CAPEX_AS_OF 与 pv.capexPerWatt / storage.capexPerKWh 两值（季度复核，
+//    联动改锚点 PINS 与 m1 基线，对照记录在 verify/external-anchors.md）、
 //    分时结构名单换版只改 CYCLES_AS_OF、充电桩配建档换版只改 CHARGER_RATIO_AS_OF 与
 //    charger.policyRatioByProvince 表值（增删省同步 CHARGER_RATIO_SOURCES），
 //    所有来源句与界面提示自动收敛，不再散落多处手改） ──
 export const SPREAD_AS_OF = '2026年9月' // 峰谷价差：电网代理购电月度表所属月份
 export const ELECP_AS_OF = '2024–2025' // 分省电价：工商业购电水平大致区间
+export const CAPEX_AS_OF = '2026年9月' // 光伏/储能单位造价：外部锚定复核日期（建议季度）
 export const CYCLES_AS_OF = '2026年9月' // 分时结构：分省两充两放名单所属复核窗口（建议按季度复核名单）
 export const CHARGER_RATIO_AS_OF = '2026年9月' // 充电桩分省配建政策档：口径复核日期
 
@@ -320,7 +323,7 @@ export const coefficientSections = [
         label: '单位造价',
         unit: '元/W',
         step: 0.1,
-        source: '演示假设值：2025 年工商业分布式光伏 EPC 常见区间 3.0–4.0 元/W',
+        source: `${CAPEX_AS_OF} 外部锚定（对照记录 verify/external-anchors.md）：大 EPC 分布式均价 2.55 元/W（光伏头条周报）+ 2026 年工商业实例带 2.5–3.6 元/W，工商业屋顶复杂度高于大 EPC 均价留余量取 3.0`,
       },
       {
         path: 'pv.performanceRatio',
@@ -354,7 +357,7 @@ export const coefficientSections = [
         label: '单位容量造价',
         unit: '元/kWh',
         step: 50,
-        source: '演示假设值：2025 年工商业储能系统常见区间 800–1,200 元/kWh（即 0.8–1.2 元/Wh）',
+        source: `${CAPEX_AS_OF} 外部锚定（对照记录 verify/external-anchors.md）：2025 H1 工商业储能柜中标加权均价 809.7 元/kWh（CESA 统计，入围带 550–1,333），加安装配套与 2026 年反弹余量取 850（0.85 元/Wh）`,
       },
       {
         path: 'storage.cycle2SpreadRatio',

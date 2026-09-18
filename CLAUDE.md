@@ -89,8 +89,8 @@ src/
 
 ```js
 {
-  pv:       { capexPerWatt: 3.5 },            // 元/W
-  storage:  { capexPerKWh: 1200, cycle2SpreadRatio: 0.5 }, // 元/kWh / 两充两放省第二循环价差比（峰−平≈半额）
+  pv:       { capexPerWatt: 3.0 },            // 元/W（2026-09 外部锚定，季度复核 CAPEX_AS_OF）
+  storage:  { capexPerKWh: 850, cycle2SpreadRatio: 0.5 }, // 元/kWh（同上）/ 两充两放省第二循环价差比（峰−平≈半额）
   cooling:  { capexPerSqm: 300, coolingPricePerKwh: 0.75, cop: 5.0 }, // 集中供冷：能源站+管网新建，冷费收益
   charger:  { capexPerPile: 50000, dailyKwhPerPile: 300, serviceFee: 0.45 }, // 元/桩 / kWh·桩⁻¹·日⁻¹ / 元/kWh
   provinces: {                                  // 按省

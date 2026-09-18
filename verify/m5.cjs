@@ -1,7 +1,7 @@
 // 全链路验证脚本 · 双界面切换 + 动态配置中心联动
 // 链路：完成①② → 演示模式三列同屏（状态保留）→ 回工作模式（状态不丢）
-//       → 专家参数：光伏造价 3.5→3.0 保存 → 组合投资 820→720 自动重算
-//       → 恢复默认 → 820 → 电力市场数据：广东电价 0.75→0.9 → 毛收益 200.2→228.6（9月价差口径）
+//       → 专家参数：光伏造价 3.0→2.8 保存 → 组合投资 685→645 自动重算（2026-09 capex 换版后默认 3.0）
+//       → 恢复默认 → 685 → 电力市场数据：广东电价 0.75→0.9 → 毛收益 200.2→228.6（9月价差口径）
 //         （储能收益按分省峰谷价差 × 分时循环独立计，电价轴现只影响光伏收益与供冷购电成本）
 //       → 公开数据：办公屋面可用系数 0.4→0.5 → 模块① 推荐光伏 800→1000 kW 自动重算
 //         （屋面/供冷折算/充电桩配建参考表迁入公开抽屉后的联动回归）
@@ -74,18 +74,18 @@ const dataCards = (page) =>
   report.extracted.backToWork = await dataCards(page)
   log('回工作模式：组合总账仍在')
 
-  // ── 3. 专家参数：光伏造价 3.5 → 3.0 ──
+  // ── 3. 专家参数：光伏造价 3.0 → 2.8 ──
   await page.locator('button:has-text("专家参数")').click()
   const expert = page.locator('[aria-label="专家参数配置"]')
   await expert.waitFor({ timeout: 5000 })
   report.extracted.expertGroups = await expert.locator('h4').allTextContents()
   const capexInput = expert.locator('section:has(h4:text("光伏")) input[type="number"]').first()
-  await capexInput.fill('3.0')
+  await capexInput.fill('2.8')
   await expert.locator('button:has-text("保存配置")').click()
   await page.waitForTimeout(600)
   report.extracted.afterCapexChange = await dataCards(page)
   await page.screenshot({ path: path.join(shotDir, 'm5-02-after-capex.png'), fullPage: true })
-  log('专家参数保存（光伏 3.0 元/W）→ 自动重算')
+  log('专家参数保存（光伏 2.8 元/W）→ 自动重算')
 
   // ── 4. 恢复默认 ──
   await page.locator('button:has-text("专家参数")').click()
@@ -94,7 +94,7 @@ const dataCards = (page) =>
   await expert.locator('button:has-text("保存配置")').click()
   await page.waitForTimeout(600)
   report.extracted.afterRestore = await dataCards(page)
-  log('恢复默认 → 820.00 复现')
+  log('恢复默认 → 685.00 复现')
 
   // ── 5. 电力市场数据抽屉：广东电价 0.75 → 0.9 ──
   await page.locator('button:has-text("电力市场数据")').click()

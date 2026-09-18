@@ -67,13 +67,14 @@ const log = (m) => {
   // 方案数字与模块② 同源抽查
   const rt = report.extracted.reportText || ''
   report.extracted.numberCheck = {
-    invest820: rt.includes('820.00'),
-    irr263: rt.includes('26.3'),
+    invest685: rt.includes('685.00'),
+    irr273: rt.includes('27.3'),
     payback36: rt.includes('3.6'),
-    carbon1405: rt.includes('1405.9'),
+    carbon1239: rt.includes('1239.2'),
     fiveSections: ['一、项目概述', '二、财务分析', '三、技术路径', '四、建设节奏', '五、预期收益'].every((s) => rt.includes(s) || rt.includes(s.replace(/一、|二、|三、|四、|五、/, ''))),
     phasingInjected: rt.includes('一期') || rt.includes('一次性建成'),
-    sensitivityInjected: rt.includes('最敏感变量'),
+    // 「最敏感变量」在版式区敏感性表（.md 正文容器之外），正文查引用句
+    sensitivityInjected: rt.includes('分项明细与敏感性结论见执行摘要数据表'),
     eraNoteInjected: rt.includes('建成于 2010 年 · 节能 50%（GB 50189-2005）'),
   }
 
