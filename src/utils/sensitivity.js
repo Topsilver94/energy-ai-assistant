@@ -100,16 +100,17 @@ export const buildSensitivity = ({ systems, province, demand }, config) => {
   const base = solve(systems, province, demand, config)
   if (!base) return null
 
-  // 回收期 N/A（口径轮后 = 合并现金流在计算期内累计收不回投资，IRR ≤ 0 与之同态）时
-  // 敏感性不适用——年净首年为正也可能落入此态（长周期衰减 + 短寿命负流分项拖累累计）
-  if (base.paybackPeriod === 'N/A') {
+  // 判据挂 IRR（口径轮 B）：IRR ≤ 0（含现金流总收益 ≤ 0 时的 calcIrr 哨兵 0）⟺ 合并流
+  // 在计算期内收不回投资 ⟺ 回收期 N/A——同态律下两判据等价，挂 IRR 表意更直（经济上
+  // 收不回，扰动它无意义）。年净首年为正也可能落入此态（长周期衰减拖累累计）
+  if (base.irr <= 0) {
     return {
       applicable: false,
       base,
       rows: [],
       flat: [],
       hurdle: config.general.discountRate,
-      summaryLines: ['组合现金流在计算期内收不回投资（静态回收期 N/A），敏感性分析不适用'],
+      summaryLines: ['组合现金流在计算期内收不回投资（IRR ≤ 0，回收期 N/A），敏感性分析不适用'],
     }
   }
 

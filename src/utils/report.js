@@ -10,6 +10,7 @@
  * 红线：模板里只出现文案与格式，所有数字来自入参（store 结果 + config 系数）。
  */
 import { PROJECT_TYPES } from '../stores/projectStore.js'
+import { formatIrr } from './finance.js'
 import { getRecommendations, eraOf, pvMandatedHint } from './diagnosis.js'
 import { buildPhasing } from './phasing.js'
 import { coolingDesignKw, coolingTcoNote, STORAGE_FIRE_LINE } from './recommend.js'
@@ -165,7 +166,7 @@ export const buildReportDraft = (project, diagnosis, config) => {
         : `实际能耗强度 ${fmt(d.actualIntensity)} kWh/㎡·a，对标基准 ${d.benchmarkIntensity ?? '—'} kWh/㎡·a，能效评级「${d.rating ?? '—'}」${d.estimate ? '（电费未知，按预估口径推演，补电费单后转实测对标）' : d.curve ? `（负荷曲线实测口径：最大需量 ${Math.round(d.curve.maxKw)} kW · 负荷率 ${Math.round(d.curve.loadFactor * 100)}%）` : ''}`
     }\n\n` +
     '## 二、财务分析\n\n' +
-    `组合投资估算 ${fmt(f.totalInvestment, 2)} 万元，年毛收益 ${fmt(f.annualRevenue)} 万元/年，IRR ${fmt((f.irr ?? 0) * 100)} %，静态回收期 ${payback}（按合并现金流测算，共同计算期取各系统寿命最大值）；年碳减排 ${fmt(f.carbonReduction)} tCO₂。${storageScopeText}分项明细与敏感性结论见执行摘要数据表。\n\n` +
+    `组合投资估算 ${fmt(f.totalInvestment, 2)} 万元，年毛收益 ${fmt(f.annualRevenue)} 万元/年，IRR ${formatIrr(f.irr ?? 0, f.paybackPeriod)}，静态回收期 ${payback}（按合并现金流测算，共同计算期取各系统寿命最大值）；年碳减排 ${fmt(f.carbonReduction)} tCO₂。${storageScopeText}分项明细与敏感性结论见执行摘要数据表。\n\n` +
     `## 三、技术路径建议（${isNew ? '新建 · 一体化设计' : '模块① 诊断建议'}）\n\n` +
     `${numberedMeasures || '—'}\n` +
     // 布置红线仅出模块③（本地路径技术段注记；AI 路径由 prompt 注入同款内容）

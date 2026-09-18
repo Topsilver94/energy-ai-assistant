@@ -5,6 +5,7 @@ import { useDiagnosisStore } from '../../stores/diagnosisStore'
 import { useAiStore } from '../../stores/aiStore'
 import { useConfigStore } from '../../stores/configStore'
 import { buildSensitivity } from '../../utils/sensitivity'
+import { formatIrr } from '../../utils/finance'
 import { keyParams } from '../../utils/report'
 import { SPREAD_AS_OF } from '../../data/coefficients'
 
@@ -59,8 +60,9 @@ export default function ReportDocument({ wide = true, children }) {
     selected.some((t) => t.key === 'storage') &&
     (provCfg.cyclesPerDay ?? 1) >= 2
 
-  // 执行摘要数据卡取值（IRR 非有限值 / 回收期 N/A 时如实显示，不硬造数字）
-  const irrText = Number.isFinite(f.irr) ? fmt(f.irr * 100) : '—'
+  // 执行摘要数据卡取值（IRR 非有限值 / 回收期 N/A 时如实显示，不硬造数字；
+  // IRR 哨兵 0（收不回投资）经 formatIrr 统一转 N/A）
+  const irrText = Number.isFinite(f.irr) ? formatIrr(f.irr, f.paybackPeriod) : '—'
   const paybackText = f.paybackPeriod === 'N/A' ? 'N/A' : fmt(f.paybackPeriod)
 
   // 报告头元信息（诊断快照，避免表单后续编辑造成错位）
@@ -173,7 +175,7 @@ export default function ReportDocument({ wide = true, children }) {
                   {it.capacity} {t?.scaleUnit ?? ''}
                 </td>
                 <td className="tabular px-2 py-1.5 font-mono">{fmt(it.totalInvestment, 2)}</td>
-                <td className="tabular px-2 py-1.5 font-mono">{fmt((it.irr ?? 0) * 100)} %</td>
+                <td className="tabular px-2 py-1.5 font-mono">{formatIrr(it.irr ?? 0, it.paybackPeriod)}</td>
                 <td className="tabular px-2 py-1.5 font-mono">{itPayback}</td>
                 <td className="tabular px-2 py-1.5 font-mono">{carbon}</td>
               </tr>

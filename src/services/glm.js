@@ -12,6 +12,7 @@
  * 红线：apiKey 只经请求头传输，不写日志、不持久化。
  */
 import { PROJECT_TYPES } from '../stores/projectStore.js'
+import { formatIrr } from '../utils/finance.js'
 import { buildPhasing } from '../utils/phasing.js'
 import { buildSensitivity } from '../utils/sensitivity.js'
 import { coolingDesignKw, coolingTcoNote, STORAGE_FIRE_LINE } from '../utils/recommend.js'
@@ -59,7 +60,7 @@ export const buildPrompt = (project, diagnosis, config) => {
       return `${t.label} ${systems[t.key].capacity}${t.scaleUnit}${kw ? `（折算设计冷负荷约 ${kw} kW）` : ''}`
     })
     .join(' + ')
-  const irr = Number.isFinite(f.irr) ? fmt(f.irr * 100) : '—'
+  const irr = Number.isFinite(f.irr) ? formatIrr(f.irr, f.paybackPeriod) : '—'
   const payback = f.paybackPeriod === 'N/A' ? 'N/A' : fmt(f.paybackPeriod)
   const itemLines = items
     .map((it) => {
@@ -67,7 +68,7 @@ export const buildPrompt = (project, diagnosis, config) => {
       const itPayback = it.paybackPeriod === 'N/A' ? 'N/A' : fmt(it.paybackPeriod)
       return (
         `- ${t?.label ?? it.type}：规模 ${it.capacity}${t?.scaleUnit ?? ''}，` +
-        `投资 ${fmt(it.totalInvestment, 2)} 万元，IRR ${fmt((it.irr ?? 0) * 100)}%，` +
+        `投资 ${fmt(it.totalInvestment, 2)} 万元，IRR ${formatIrr(it.irr ?? 0, it.paybackPeriod)}，` +
         `回收期 ${itPayback} 年，碳减排 ${it.carbonReduction > 0 ? fmt(it.carbonReduction) : 0} tCO₂/a`
       )
     })

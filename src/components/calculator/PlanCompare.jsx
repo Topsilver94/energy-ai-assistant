@@ -46,6 +46,8 @@ const fmt = (col, total) => {
   const v = total[col.key]
   if (v === 'N/A') return 'N/A'
   if (!Number.isFinite(v)) return '—'
+  // IRR 哨兵 0（现金流收不回投资，回收期必 N/A）统一转 N/A——判据同 utils/finance formatIrr
+  if (col.key === 'irr' && v === 0 && total.paybackPeriod === 'N/A') return 'N/A'
   if (col.pct) return `${(v * 100).toFixed(col.digits)}%`
   if (col.key === 'carbonReduction' && v <= 0) return '—'
   return v.toFixed(col.digits)

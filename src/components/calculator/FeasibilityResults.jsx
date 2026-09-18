@@ -5,7 +5,7 @@ import SensitivityTable from './SensitivityTable'
 import PlanCompare from './PlanCompare'
 import { PROJECT_TYPES, useProjectStore } from '../../stores/projectStore'
 import { useConfigStore } from '../../stores/configStore'
-import { calculateFeasibility } from '../../utils/finance'
+import { calculateFeasibility, formatIrr } from '../../utils/finance'
 import { buildSensitivity } from '../../utils/sensitivity'
 import { buildLedgerSnapshot, copyText } from '../../utils/export'
 
@@ -84,7 +84,7 @@ export default function FeasibilityResults() {
       {/* 组合总账 */}
       <div className="grid grid-cols-2 gap-3">
         <DataCard icon={Wallet} label="组合投资 · 万元" value={total.totalInvestment.toFixed(2)} />
-        <DataCard icon={TrendingUp} label="组合 IRR" value={`${(total.irr * 100).toFixed(1)}%`} accent />
+        <DataCard icon={TrendingUp} label="组合 IRR" value={formatIrr(total.irr, total.paybackPeriod)} accent />
         <DataCard icon={Timer} label="组合回收期 · 年" value={payback} />
         <DataCard icon={Leaf} label="组合碳减排 · tCO₂/a" value={total.carbonReduction.toFixed(1)} />
       </div>
@@ -157,7 +157,7 @@ export default function FeasibilityResults() {
                     {item.totalInvestment.toFixed(1)}
                   </td>
                   <td className="tabular px-3 py-2 text-right font-mono text-paper-mute">
-                    {(item.irr * 100).toFixed(1)}%
+                    {formatIrr(item.irr, item.paybackPeriod)}
                   </td>
                   <td className="tabular px-3 py-2 text-right font-mono text-paper-mute">
                     {itemPayback}

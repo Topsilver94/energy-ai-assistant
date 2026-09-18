@@ -76,6 +76,17 @@ const calcIrr = (investment, flows) => {
 }
 
 /**
+ * IRR 展示口径（口径轮 B）：calcIrr 在现金流总收益 ≤ 0 时返回哨兵 0——该态 IRR 真无解
+ * （未折现流本身收不回投资，回收期必为 'N/A'），展示层应报 N/A 而非误导性的「0.0%」。
+ * 真负 IRR（0 < 总流量 < 投资时的二分负根）如实显示负值；真 0（总流量恰等于投资，
+ * 期末回本、回收期有解）不落此分支。判据「paybackPeriod === 'N/A' 且 irr === 0」与
+ * 哨兵一一对应（同态律见 verify/numeric-audit 疑点②守护）。所有 IRR 出口统一走本函数，
+ * 同一数字不得两处两个语义
+ */
+export const formatIrr = (irr, paybackPeriod, digits = 1) =>
+  paybackPeriod === 'N/A' && irr === 0 ? 'N/A' : `${(irr * 100).toFixed(digits)}%`
+
+/**
  * 四类系统的分型测算。
  * 统一产出：capex / gross（投资与年毛收益，万元）/ energyKwh（碳减排口径电量，kWh）
  * + 对应系数组的运维比例与计算期，可选 fixedOm（固定年成本，万元，如场地租金）。
