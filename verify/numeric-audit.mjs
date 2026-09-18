@@ -21,6 +21,7 @@ import { defaultBenchmarks } from '../src/data/benchmarks.js'
 import { calculateFeasibility } from '../src/utils/finance.js'
 import { buildSensitivity } from '../src/utils/sensitivity.js'
 import { buildRecommendations } from '../src/utils/recommend.js'
+import { calculateDiagnosis } from '../src/utils/diagnosis.js'
 
 // 深拷贝：本脚本会 delete 可选系数、调高造价做复现，必须与模块级默认值完全隔离
 const cfg0 = () => structuredClone({ ...defaultConfig, benchmarks: defaultBenchmarks })
@@ -49,8 +50,8 @@ const CHECK_IDS = [
   '⑤ 线性齐次（2 的幂 ⇒ 逐位）', '⑥ 需量分段封顶', '⑦ 敏感性接线（平坦轴/方向/基准档）',
   '⑧ NaN 泄漏扫描', '⑨ recommend→finance 联动', '⑩ horizon 截断生效', '⑪ 入参边界',
   '疑点① 回收期=合并流累计穿越（口径轮已修·守护）', '疑点② IRR>0 ⟺ 回收期有解（口径轮已修·同态律）',
-  '疑点③ 负 IRR ⇒ 回收 N/A（口径轮已修·守护）', '疑点④ 未收录省静默回退（钉现状）',
-  '疑点⑤ 既有建筑误挂新建文案（钉现状）', '疑点⑥ 暂缓档不可达（钉现状）',
+  '疑点③ 负 IRR ⇒ 回收 N/A（口径轮已修·守护）', '疑点④ 未知省份不静默回退（口径轮已修·守护）',
+  '疑点⑤ 既有建筑缺电量定容文案（口径轮已修·守护）', '疑点⑥ 三档制·暂缓已删（口径轮已修·守护）',
   '自检 模块默认值未被本脚本污染',
 ]
 const bad = {}
@@ -339,6 +340,8 @@ const allCards = []
   }
   throws(() => calculateFeasibility({}, c), '缺 systems')
   throws(() => calculateFeasibility({ systems: { 未知: { enabled: true, capacity: 100 } }, province: '广东' }, c), '未知类型 + 容量>0')
+  // 未知省份 fail-fast（口径轮 C，疑点④）：不再静默回退首键算法
+  throws(() => calculateFeasibility({ systems: { pv: { enabled: true, capacity: 1000 } }, province: '不存在省' }, c), '未知省份')
   isNull(() => calculateFeasibility({ systems: {}, province: '广东' }, c), '空 systems')
   isNull(() => calculateFeasibility({ systems: { pv: { enabled: false, capacity: 1000 } }, province: '广东' }, c), '禁用系统')
   isNull(() => calculateFeasibility({ systems: { pv: { enabled: true, capacity: 0 } }, province: '广东' }, c), '容量 0')
@@ -347,10 +350,10 @@ const allCards = []
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// 疑点段（2026-09-18 审计发现）。①②③ 已随口径轮（同日）修复——本节转为守护断言；
-// ④⑤⑥ 仍「只记录不擅改」，修复需先定口径改 CLAUDE.md，改后对应断言会红，红=行为已变
+// 疑点段（2026-09-18 审计发现）。①—⑥ 已随口径轮（2026-09-19 A/B/C 三步）全部修复，
+// 本节全为守护断言——行为再变即红，红=有口径被改动，需先核 CLAUDE.md 再同步此节
 // ══════════════════════════════════════════════════════════════════════════
-console.log('\n── 疑点现状（①②③已修守护 / ④⑤⑥钉住供口径轮对照）──')
+console.log('\n── 疑点守护（①—⑥ 已随口径轮修复，断言防回退）──')
 {
   // ① 口径轮修复后：回收期 = 合并逐年现金流（含衰减）累计穿越投资额，与 IRR 同流同口径。
   //   旧口径「投资 ÷ 全寿命年净」已废弃——储能 10 年到期后不再在分母虚贡献，回收期如实
@@ -371,8 +374,8 @@ console.log('\n── 疑点现状（①②③已修守护 / ④⑤⑥钉住供�
 {
   // ② 口径轮后原矛盾结构性消失（IRR>0 ⟺ 回收有解，全网格同态律见上）。本场景原是矛盾
   //    复现点（pv1500+充电200桩·日均 17.9：IRR +0.15% 却 N/A）——衰减口径下未折现总流量
-  //    跌破投资额，IRR 转负，与 N/A 同态一致。sensitivity 的 N/A 短路 gate 留待后续轮次
-  //    改挂 IRR（届时语义等价，此处仅同步标签）
+  //    跌破投资额，IRR 转负，与 N/A 同态一致。sensitivity 的短路 gate 已随 B 轮改挂 IRR
+  //    （irr ≤ 0 即不适用，与「回收期 N/A」语义同源）
   const c = cfg0()
   c.charger.dailyKwhPerPile = 17.9
   const r = calculateFeasibility(
@@ -390,8 +393,8 @@ console.log('\n── 疑点现状（①②③已修守护 / ④⑤⑥钉住供�
 }
 {
   // ③ 口径轮修复后：负 IRR 与「计算期内永不回收」同态——供冷造价×2 时 IRR −2.04% 且
-  //    回收期如实报 N/A（旧口径报数值 25，"永远收不回"却显示 25 年）。负 IRR 的
-  //    展示层语义（界面如何呈现负值）属后续轮次，本处只钉引擎层同态
+  //    回收期如实报 N/A（旧口径报数值 25，"永远收不回"却显示 25 年）。展示层语义已随
+  //    B 轮 formatIrr 统一（哨兵 0→N/A，真负根如 −2.0% 如实显示），本处钉引擎层同态
   const c = cfg0()
   c.cooling.capexPerSqm = 600
   const r = calculateFeasibility({ systems: { cooling: { enabled: true, capacity: 1 } }, province: '广东' }, c)
@@ -402,34 +405,51 @@ console.log('\n── 疑点现状（①②③已修守护 / ④⑤⑥钉住供�
   }
 }
 {
-  // ④ 未收录省静默回退：省名不存在时按 provinces 首键（北京）算完，result.province 仍回显
-  //    传入名——错省数字配错省名。界面不可达（下拉框只列合法省），API 层防御缺口
+  // ④ 口径轮 C 修复：未知省份不再静默回退首键（北京）算法——原「错省数字配错省名」。
+  //    三引擎入口各随其错误契约防御：calculateFeasibility 抛错 / calculateDiagnosis 返回
+  //    null / buildRecommendations 返回 []；渲染层兜底仅防黑屏（上游已守，不可达）
   const c = cfg0()
-  const r = calculateFeasibility({ systems: { pv: { enabled: true, capacity: 1000 } }, province: '不存在省' }, c)
-  const bj = calculateFeasibility({ systems: { pv: { enabled: true, capacity: 1000 } }, province: '北京' }, c)
-  console.log(`④ 未收录省：收益 ${r.total.annualRevenue} === 北京 ${bj.total.annualRevenue}，回显省名「${r.province}」`)
-  if (!(r.province === '不存在省' && r.total.annualRevenue === bj.total.annualRevenue)) {
-    fail('疑点④ 未收录省静默回退（钉现状）', '回退行为已变（可能已加防御），请核')
+  const throws = (fn) => {
+    try {
+      fn()
+      return false
+    } catch {
+      return true
+    }
+  }
+  const fOk = throws(() => calculateFeasibility({ systems: { pv: { enabled: true, capacity: 1000 } }, province: '不存在省' }, c))
+  const dOk = calculateDiagnosis({ buildingNature: 'existing', area: 10000, buildingType: '办公', annualElectricityFee: 60, province: '不存在省' }, c) === null
+  const rOk = buildRecommendations({ buildingNature: 'existing', buildingType: '办公', area: 10000, province: '不存在省' }, c).length === 0
+  console.log(`④ 未知省份：finance 抛错 ${fOk} / diagnosis 返回 null ${dOk} / recommend 返回 [] ${rOk}`)
+  if (!(fOk && dOk && rOk)) {
+    fail('疑点④ 未知省份不静默回退（口径轮已修·守护）', '三入口防御行为已变，请核')
   }
 }
 {
-  // ⑤ 既有建筑年电量缺失 → 储能触发依据误挂「新建无负荷数据」文案（recommend.js 的
-  //    isNew || !Number.isFinite(annualKwh) 分支）。界面不可达（既有走预估兜底必得数）
+  // ⑤ 口径轮 C 修复：既有建筑缺年电量的定容依据不再挂「新建」文案——两性质分述；
+  //    既有缺数据仅快照残缺路径可达（界面既有必走预估兜底得数）
   const cards = buildRecommendations({ buildingNature: 'existing', buildingType: '办公', area: 10000, province: '广东' }, cfg0())
   const st = cards.find((card) => card.key === 'storage')
-  console.log(`⑤ 既有建筑缺年电量：储能首条依据「${st.reasons.find((s) => s.includes('新建无负荷数据')) ?? '（无）'}」`)
-  if (!st.reasons.some((s) => s.includes('新建无负荷数据'))) {
-    fail('疑点⑤ 既有建筑误挂新建文案（钉现状）', '文案分支已改，请核')
+  const hasExistingWording = st.reasons.some((s) => s.includes('年用电量未知'))
+  const leakedNewWording = st.reasons.some((s) => s.includes('新建无负荷数据'))
+  console.log(`⑤ 既有建筑缺年电量：储能定容依据${hasExistingWording ? '「年用电量未知…兜底」' : '（未命中既有文案）'}，新建文案${leakedNewWording ? '仍误挂！' : '已分离'}`)
+  if (leakedNewWording || !hasExistingWording) {
+    fail('疑点⑤ 既有建筑缺电量定容文案（口径轮已修·守护）', '文案分支已变，请核')
+  }
+  const newCards = buildRecommendations({ buildingNature: 'new', buildingType: '办公', area: 10000, province: '广东' }, cfg0())
+  if (!newCards.find((card) => card.key === 'storage').reasons.some((s) => s.includes('新建无负荷数据'))) {
+    fail('疑点⑤ 既有建筑缺电量定容文案（口径轮已修·守护）', '新建分支原文案丢失，请核')
   }
 }
 {
-  // ⑥ 「暂缓」档默认系数下不可达：全部场景最低分 28（供冷低于门槛档），levelOf 末行死代码。
-  //    未破坏功能，仅记录——若未来系数/规则调整使低分可达，此断言会提醒档位语义复活
+  // ⑥ 口径轮 C：「暂缓」档删除——打分为引擎逻辑常数（光伏 ≥45 / 储能 ≥48 / 供冷 ≥28 /
+  //    充电桩 ≥45），<25 对任何 config 结构性不可达，兑现不了的档位即删（levelOf 兜底
+  //    谨慎、LEVEL_TONES 同步收敛三档）。打分权重调整使低分可达时本断言红=提醒重评档位
   const minScore = Math.min(...allCards.map((card) => card.score))
   const levels = new Set(allCards.map((card) => card.level))
-  console.log(`⑥ 全场景最低分 ${minScore}，出现档位 ${[...levels].join('/')}${levels.has('暂缓') ? '（暂缓可达！）' : '（暂缓不可达，死档）'}`)
-  if (minScore !== 28 || levels.has('暂缓')) {
-    fail('疑点⑥ 暂缓档不可达（钉现状）', `最低分 ${minScore}，档位 ${[...levels].join('/')}——档位可达性已变，请复核展示语义`)
+  console.log(`⑥ 三档制：全场景最低分 ${minScore}，出现档位 ${[...levels].join('/')}`)
+  if (minScore !== 28 || levels.has('暂缓') || levels.size > 3) {
+    fail('疑点⑥ 三档制·暂缓已删（口径轮已修·守护）', `最低分 ${minScore}，档位 ${[...levels].join('/')}——打分使低分可达时需重评档位`)
   }
 }
 
@@ -451,4 +471,4 @@ for (const id of CHECK_IDS) {
   }
 }
 process.exitCode = red > 0 ? 1 : 0
-console.log(red === 0 ? '\n审计通过：不变量与守护项均符合现状（疑点①②③已随口径轮修复，④⑤⑥见上方现状描述）' : `\n审计 ${red} 类异常`)
+console.log(red === 0 ? '\n审计通过：不变量与守护项均符合现状（疑点①—⑥ 已随口径轮 A/B/C 修复，断言防回退）' : `\n审计 ${red} 类异常`)

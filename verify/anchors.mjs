@@ -399,8 +399,8 @@ const enc = (csv) => new TextEncoder().encode(csv)
 {
   // 档位边界：供冷 数据中心 5000㎡ / 商场 20000㎡ 正好压线 → 75「推荐」；
   // 新建非商场充电桩 45+5 = 50 正好压线「可考虑」。
-  // 「暂缓」（<25）默认系数下够不到（理论最低分 28 = 供冷低于门槛档）——levelOf 末行为
-  // 死代码，如实记录不硬造（numeric-audit 观察⑥同款）
+  // 三档制（口径轮 C）：打分为引擎逻辑常数（最低 28 = 供冷低于门槛档），「暂缓」（<25）
+  // 对任何 config 结构性不可达，档位已删（numeric-audit 疑点⑥守护同款）
   const rec = (params) => buildRecommendations({ province: '广东', ...params }, C)
   const byKey = (cards, key) => cards.find((c) => c.key === key)
   const dc = byKey(rec({ buildingType: '数据中心', area: 5000 }), 'cooling')

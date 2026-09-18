@@ -54,7 +54,10 @@ export const calculateDiagnosis = (
   const area = Number(rawArea)
   if (!Number.isFinite(area) || area <= 0) return null
 
-  const prov = config.provinces[province] ?? Object.values(config.provinces)[0]
+  // 未知省份不静默兜底（口径轮 C，疑点④）：错误省电价反推的年电量比无结果更误导
+  // （与未知类型返回 null 同款防御；表单省份由合法省列表派生，仅快照残缺路径可达）
+  if (!config.provinces[province]) return null
+  const prov = config.provinces[province]
   const benchmark = config.benchmarks[buildingType]
   // 未知类型不静默兜底（错误基准比无结果更误导），表单类型由 benchmarkTypes 派生
   if (!benchmark) return null

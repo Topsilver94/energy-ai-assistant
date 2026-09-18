@@ -1,13 +1,12 @@
 import { ArrowDownToLine } from 'lucide-react'
 import Button from '../ui/Button'
 
-// level 徽章：推荐=亮绿（选中态语义），可考虑=灰，谨慎=amber（唯一警示色），暂缓=灰弱。
+// level 徽章：推荐=亮绿（选中态语义），可考虑=灰，谨慎=amber（唯一警示色）。
 // 导出供模块② 方案比选表复用同一套色——同一 level 在两处必须同色，不做第二份映射
 export const LEVEL_TONES = {
   推荐: 'border-volt/50 bg-volt/10 text-volt',
   可考虑: 'border-line bg-ink-raised text-paper-mute',
   谨慎: 'border-amber/40 bg-amber/10 text-amber',
-  暂缓: 'border-line bg-transparent text-paper-mute',
 }
 
 /**

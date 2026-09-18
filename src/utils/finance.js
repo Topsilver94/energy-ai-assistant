@@ -95,7 +95,10 @@ export const formatIrr = (irr, paybackPeriod, digits = 1) =>
  *   measured=true 表示 baseKw 来自负荷曲线实测最大需量（而非双口径推定）——报告文案据此标注口径。
  */
 const perType = (projectType, scale, province, config, demand) => {
-  const prov = config.provinces[province] ?? Object.values(config.provinces)[0]
+  // 未知省份 fail-fast（口径轮 C，疑点④）：原静默回退首键算法、回显错省名——错省数字
+  // 比无结果更误导；与「未知系统类型」同款防御（渲染层调用方均有 try/catch 保留旧结果）
+  const prov = config.provinces[province]
+  if (!prov) throw new Error(`calculateFeasibility: 未知省份「${province}」，请从分省列表选择`)
   const price = prov.elecPrice // 元/kWh
 
   if (projectType === 'pv') {

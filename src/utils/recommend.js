@@ -55,6 +55,8 @@ const COOLING_WEAK_TYPES = ['高校', '工业厂房']
  */
 export const coolingTcoNote = (province, config) => {
   const c = config.cooling
+  // 渲染路径不抛错（防黑屏红线）；引擎入口（buildRecommendations）已对未知省份返回 []，
+  // 此兜底仅防独立调用时的渲染崩溃，正常流程不可达
   const prov = config.provinces[province] ?? Object.values(config.provinces)[0]
   const splitElec = (c.kwhPerSqm / c.copBaseline) * prov.elecPrice // 分体电费 = 冷量 ÷ 分散 COP × 电价
   const splitOm = c.splitAcCapexPerSqm * c.splitAcOmRatioPerYear
@@ -72,8 +74,8 @@ const levelOf = (score) => {
   const b = R.levelBuckets.values
   if (score >= b['推荐']) return '推荐'
   if (score >= b['可考虑']) return '可考虑'
-  if (score >= b['谨慎']) return '谨慎'
-  return '暂缓'
+  // 谨慎兜底：打分为引擎逻辑常数（下限 28），「暂缓」档结构性不可达已删（口径轮 C，见 rules source）
+  return '谨慎'
 }
 
 /** 单系统财务预估：调自家计算器（try 兜形状异常，返回 null 时热力图显示 —）；
@@ -123,7 +125,10 @@ export const buildRecommendations = (
 ) => {
   const area = Number(rawArea)
   if (!Number.isFinite(area) || area <= 0) return []
-  const prov = config.provinces[province] ?? Object.values(config.provinces)[0]
+  // 未知省份不静默兜底（口径轮 C，疑点④）：回退首省会按错省价差/电价打分与定容；
+  // 返回空数组与非法 area 同款防御（表单省份合法，仅快照残缺路径可达）
+  if (!config.provinces[province]) return []
+  const prov = config.provinces[province]
   const isNew = buildingNature === 'new'
   // GB 55015 光伏强条：既有建成 ≥2022 年 → 光伏推荐附余量核对提示（新建按强条设计，不受此限）
   const pvHint = isNew ? null : pvMandatedHint(rawYear)
@@ -228,8 +233,12 @@ export const buildRecommendations = (
   let sizingReasons
   if (isNew || !Number.isFinite(annualKwh) || annualKwh <= 0) {
     storageKwh = Math.max(R.storageMinKwh.values, Math.round(pvKw * R.storageToPvRatio.values))
+    // 口径轮 C：新建与既有缺数据拆开表述——既有建筑挂「新建」文案属口径错位（疑点⑤）；
+    // 既有缺年电量仅快照残缺路径可达（界面既有必走预估兜底得数），如实写明缺口
     sizingReasons = [
-      `新建无负荷数据，按光储配比 1:${R.storageToPvRatio.values} 兜底估算为 ${storageKwh} kWh，投产后按负荷曲线复核`,
+      isNew
+        ? `新建无负荷数据，按光储配比 1:${R.storageToPvRatio.values} 兜底估算为 ${storageKwh} kWh，投产后按负荷曲线复核`
+        : `年用电量未知（缺电费与预估数据），暂按光储配比 1:${R.storageToPvRatio.values} 兜底估算为 ${storageKwh} kWh，补电费单或负荷曲线后按双口径定容复核`,
     ]
   } else {
     // 负荷口径：日均用电量 × 峰段可转移系数（峰段放电可消纳上限，方案阶段代理系数）

@@ -58,6 +58,8 @@ export const basisDrift = (basis, current) =>
  * 报告版式的「附：当次测算关键参数」表数据源，ReportDocument 渲染。
  */
 export const keyParams = (systems, config, province) => {
+  // 渲染路径不抛错（防黑屏红线）；引擎已对未知省份 fail-fast/返回空，此兜底不可达，
+  // 且下行标签在兜底时如实标「默认」不冒充省名
   const prov = config.provinces[province] ?? Object.values(config.provinces)[0]
   const rows = [
     ['工商业电价', `${prov.elecPrice} 元/kWh（${config.provinces[province] ? province : '默认'}）`],

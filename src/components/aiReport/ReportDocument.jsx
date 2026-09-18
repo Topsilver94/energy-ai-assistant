@@ -54,6 +54,8 @@ export default function ReportDocument({ wide = true, children }) {
   const selected = PROJECT_TYPES.filter(
     (t) => pInputs.systems[t.key]?.enabled && Number(pInputs.systems[t.key].capacity) > 0,
   )
+  // 渲染路径不抛错（防黑屏红线）：引擎已对未知省份 fail-fast，测算结果存在即省份合法，
+  // 此兜底不可达，仅防残缺快照下的渲染崩溃
   const provCfg = config.provinces[pInputs.province] ?? Object.values(config.provinces)[0]
   const pvStorageSynergy =
     selected.some((t) => t.key === 'pv') &&
