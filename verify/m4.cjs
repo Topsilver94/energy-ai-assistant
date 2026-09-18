@@ -102,7 +102,7 @@ const log = (m) => {
     fiveSections: ['项目概述', '财务分析', '技术路径', '建设节奏', '预期收益'].every((s) => rt.includes(s)),
     numbersKept: {
       invest685: rt.includes('685'),
-      irr273: rt.includes('27.3'),
+      irr263: rt.includes('26.3'),
       payback36: rt.includes('3.6'),
       carbon1239: rt.includes('1239.2') || rt.includes('1239'),
     },

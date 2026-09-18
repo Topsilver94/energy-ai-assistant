@@ -68,7 +68,7 @@ const log = (m) => {
   const rt = report.extracted.reportText || ''
   report.extracted.numberCheck = {
     invest685: rt.includes('685.00'),
-    irr273: rt.includes('27.3'),
+    irr263: rt.includes('26.3'),
     payback36: rt.includes('3.6'),
     carbon1239: rt.includes('1239.2'),
     fiveSections: ['一、项目概述', '二、财务分析', '三、技术路径', '四、建设节奏', '五、预期收益'].every((s) => rt.includes(s) || rt.includes(s.replace(/一、|二、|三、|四、|五、/, ''))),

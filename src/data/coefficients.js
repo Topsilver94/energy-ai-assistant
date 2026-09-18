@@ -15,6 +15,7 @@ export const defaultConfig = {
   pv: {
     capexPerWatt: 3.0, // 元/W，工商业分布式初始投资
     performanceRatio: 0.9, // 系统效率 PR（灰尘/线损/逆变器损耗）
+    degradationPerYear: 0.0055, // 年发电量线性衰减（首年全额，自第二年起递减；运维恒定）
     omRatioPerYear: 0.01, // 年运维费占初始投资比例
     lifetimeYears: 25, // 计算期，组件功率质保 25 年
   },
@@ -27,6 +28,7 @@ export const defaultConfig = {
     depthOfDischarge: 0.9, // 可用放电深度（额定容量 × DoD = 单次可放电量）
     availableDaysPerYear: 330, // 年有效运行天数（扣检修、限电与极端天气）
     chargePricePerKwh: 0.3, // 充电时段购电价代表值（元/kWh，效率损耗电量计价用）
+    degradationPerYear: 0.025, // 年可用放电量线性衰减（首年全额，自第二年起递减；运维恒定）
     demandShaveRatio: 0.1, // 需量削峰系数：最大需量中可被储能削除的比例（行业区间 5%–15% 保守中值）
     demandPricePerKwMonth: 30, // 两部制需量电价代表值（元/kW·月）
     omRatioPerYear: 0.02,
@@ -234,6 +236,10 @@ const STORAGE_SIZING_SOURCE =
   '储能功率上限 25% 借自用户侧分布式电源接入口径：国家电网 Q/GDW 1480《分布式电源接入电网技术规定》与国家能源局 2021 年答复（分布式电源总容量不宜超上级变压器供电区域最大负荷 25%），行业另按充电功率 ≤ 变压器容量 80% 校核过载，项目按 25% 保守定容防倒送；2h 为工商业主流配置；峰段可转移系数 0.35 为演示假设值（日均用电量 → 峰段可消纳放电量的方案阶段代理），需负荷曲线核定'
 const STORAGE_ENGINEERING_SOURCE =
   '演示假设值（行业通行工程量级）：AC-AC 综合效率取 0.88（含 PCS 与变压器双向损耗，通行 85%–90%）；磷酸铁锂柜可用放电深度取 0.9；年有效运行约 330 天（扣检修、限电与极端天气）；充电损耗电量按充电时段购电价计价，取全国一般工商业谷段 0.2–0.4 元/kWh 中值 0.3'
+const DEGRADATION_PV_SOURCE =
+  '质保口径（真实数据项）：晶硅组件线性质保通行条款——首年后年衰减 ≤0.55%、25 年末功率 ≥84.8%（主流厂商公开质保书），取 0.55%/年线性；质保为最差情形承诺，实际衰减多温和于上界。首年全额、自第二年起递减，运维恒定（2026-09 口径轮引入，依据 verify/case-replay.md C4 归因：无衰减口径较第三方研报基准偏乐观约 5pp）'
+const DEGRADATION_STORAGE_SOURCE =
+  '质保口径（真实数据项）：磷酸铁锂电芯质保通行条款——10 年 SOH ≥70%–80%（主流厂商公开质保），线性化 2%–3%/年取中 2.5%；衰减作用于年放电量与套利收益，运维恒定（同上：C4 归因引入）'
 const DEMAND_SOURCE =
   '演示假设值：两部制需量电价代表值 30 元/kW·月——量级锚定第四监管周期输配电价体系分省两部制需量电价（北京档 28–33 元/kW·月，发改价格〔2026〕1077 号体系 2026-08 起），分省细化留待逐省收录；削峰系数 10% 为行业区间 5%–15% 保守中值（有 30MWh 项目实测削峰潜力仅约 2% 的反例，需负荷曲线核定）；适用前提为两部制按需量计费用户——变压器 ≥315 kVA 强制两部制（100–315 kVA 可选档保守不计），月每 kVA 用电量 ≥260 kWh 时需量电价按 90% 执行（多省明文，确定性计入）'
 const DEMAND_LF_SOURCE =
@@ -333,6 +339,13 @@ export const coefficientSections = [
         source: '演示假设值：含灰尘、线损、逆变器损耗的综合系统效率',
       },
       {
+        path: 'pv.degradationPerYear',
+        label: '年发电量衰减（小数/年）',
+        unit: '',
+        step: 0.001,
+        source: DEGRADATION_PV_SOURCE,
+      },
+      {
         path: 'pv.omRatioPerYear',
         label: '年运维比例（小数）',
         unit: '',
@@ -394,6 +407,13 @@ export const coefficientSections = [
         unit: '元/kWh',
         step: 0.05,
         source: STORAGE_ENGINEERING_SOURCE,
+      },
+      {
+        path: 'storage.degradationPerYear',
+        label: '年放电量衰减（小数/年）',
+        unit: '',
+        step: 0.0025,
+        source: DEGRADATION_STORAGE_SOURCE,
       },
       {
         path: 'storage.demandShaveRatio',

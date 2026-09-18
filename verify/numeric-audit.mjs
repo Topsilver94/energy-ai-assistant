@@ -32,21 +32,24 @@ const npv = (investment, flows, rate) => {
   for (let i = 1; i <= flows.length; i += 1) t += flows[i - 1] / (1 + rate) ** i
   return t
 }
-// 合并现金流从 items 重建（与 finance.js 同式同序，逐位一致；horizon = max(寿命)，到期归零）
-const mergedOf = (r) => {
-  const horizon = Math.max(...r.items.map((it) => it.years))
-  return Array.from(
-    { length: horizon },
-    (_, t) => r.items.reduce((acc, it) => (t < it.years ? acc + it.annualNet : acc), 0),
-  )
+// 回收期镜像（口径轮后疑点① 守护用）：与 finance.js paybackOf 同式同序逐位一致——
+// 镜像护栏防 paybackOf 将来被改成别的路径，不是正确性证据（正确性由 anchors A3 手推覆盖）
+const crossingOf = (investment, flows) => {
+  let cum = 0
+  for (let t = 0; t < flows.length; t += 1) {
+    const prev = cum
+    cum += flows[t]
+    if (cum >= investment && flows[t] > 0) return t + (investment - prev) / flows[t]
+  }
+  return 'N/A'
 }
 
 const CHECK_IDS = [
   '① config 不可变', '② 守恒律（重言式护栏）', '③ IRR 符号夹逼', '④ 单系统 total===item',
   '⑤ 线性齐次（2 的幂 ⇒ 逐位）', '⑥ 需量分段封顶', '⑦ 敏感性接线（平坦轴/方向/基准档）',
   '⑧ NaN 泄漏扫描', '⑨ recommend→finance 联动', '⑩ horizon 截断生效', '⑪ 入参边界',
-  '疑点① 合计回收期口径（钉现状）', '疑点② IRR 为正却敏感性不适用（钉现状）',
-  '疑点③ IRR 可为负 + 回收期数值（钉现状）', '疑点④ 未收录省静默回退（钉现状）',
+  '疑点① 回收期=合并流累计穿越（口径轮已修·守护）', '疑点② IRR>0 ⟺ 回收期有解（口径轮已修·同态律）',
+  '疑点③ 负 IRR ⇒ 回收 N/A（口径轮已修·守护）', '疑点④ 未收录省静默回退（钉现状）',
   '疑点⑤ 既有建筑误挂新建文案（钉现状）', '疑点⑥ 暂缓档不可达（钉现状）',
   '自检 模块默认值未被本脚本污染',
 ]
@@ -115,12 +118,27 @@ for (const run of runs) {
   if (r.total.totalInvestment !== sum((it) => it.totalInvestment)) fail('② 守恒律（重言式护栏）', `${run.id} 投资合计不等于分项和`)
   if (r.total.annualRevenue !== sum((it) => it.annualRevenue)) fail('② 守恒律（重言式护栏）', `${run.id} 毛收益合计不等于分项和`)
   if (r.total.carbonReduction !== sum((it) => it.carbonReduction)) fail('② 守恒律（重言式护栏）', `${run.id} 碳减排合计不等于分项和`)
-  if (typeof r.total.paybackPeriod === 'number' && r.total.paybackPeriod !== r.total.totalInvestment / r.total.annualNet) {
-    fail('疑点① 合计回收期口径（钉现状）', `${run.id} 回收期 ≠ 投资/年净`)
+  // 疑点① 口径轮后守护：回收期 = 合并逐年现金流累计首次穿越投资额（与 IRR 同流同口径），
+  // 与本地镜像逐位一致；顺带单侧不等式——各年流 ≤ 首年净（衰减非负）⇒ 穿越 ≥ 投资/首年净
+  if (r.total.paybackPeriod !== crossingOf(r.total.totalInvestment, r.total.mergedFlows)) {
+    fail('疑点① 回收期=合并流累计穿越（口径轮已修·守护）', `${run.id} 回收期 ≠ 合并流累计穿越镜像`)
+  }
+  if (
+    typeof r.total.paybackPeriod === 'number' &&
+    !(r.total.paybackPeriod >= r.total.totalInvestment / r.total.annualNet)
+  ) {
+    fail('疑点① 回收期=合并流累计穿越（口径轮已修·守护）', `${run.id} 回收期 < 投资/首年净（穿越比等分还快，不可能）`)
+  }
+  // 疑点② 同态律（口径轮后）：IRR>0 ⇔ 未折现总流量 > 投资 ⇔ 累计必穿越 ⇒ 回收期有解。
+  // 原「IRR 为正却 N/A」矛盾在两指标同用合并逐年现金流后结构性消失（IRR 恰为 0 的测度零
+  // 边界不在网格内；totalFlows ≤ 0 时 calcIrr 返回 0 且必 N/A，同态仍成立）
+  if ((typeof r.total.paybackPeriod === 'number') !== (r.total.irr > 0)) {
+    fail('疑点② IRR>0 ⟺ 回收期有解（口径轮已修·同态律）', `${run.id} IRR ${(r.total.irr * 100).toFixed(3)}% 与回收期 ${r.total.paybackPeriod} 不同态`)
   }
 
-  // ③ IRR 残差：符号夹逼（量纲无关）；宽松残差仅作伴随
-  const flows = mergedOf(r)
+  // ③ IRR 残差：符号夹逼（量纲无关）；宽松残差仅作伴随——直接消费引擎暴露的 mergedFlows
+  //    （口径轮前本处用 annualNet 常数年金镜像重建，比真流弱一档）
+  const flows = r.total.mergedFlows
   const flowsSum = flows.reduce((a, b) => a + b, 0)
   if (flowsSum > 0 && r.total.totalInvestment > 0) {
     const irr = r.total.irr
@@ -233,7 +251,7 @@ console.log(`网格 ${runs.length} 组合 × 敏感性 ${ranSensitivity} 次重�
 
 // ── ⑧b 可选系数逐个删除：兜底路径（?? 1 / ?? 0 / ?? 365）不得产生 NaN ──
 {
-  for (const key of ['roundTripEfficiency', 'depthOfDischarge', 'availableDaysPerYear', 'demandShaveRatio', 'demandPricePerKwMonth']) {
+  for (const key of ['roundTripEfficiency', 'depthOfDischarge', 'availableDaysPerYear', 'degradationPerYear', 'demandShaveRatio', 'demandPricePerKwMonth']) {
     const c = cfg0()
     delete c.storage[key]
     try {
@@ -244,6 +262,17 @@ console.log(`网格 ${runs.length} 组合 × 敏感性 ${ranSensitivity} 次重�
       finiteWalk(r, `删 storage.${key}`)
     } catch (e) {
       fail('⑧ NaN 泄漏扫描', `删 storage.${key} 抛错：${e.message}`)
+    }
+  }
+  {
+    // pv.degradationPerYear 同为可选兜底（?? 0）——口径轮新增系数，删除后退化恒定年金
+    const c = cfg0()
+    delete c.pv.degradationPerYear
+    try {
+      const r = calculateFeasibility({ systems: { pv: { enabled: true, capacity: 2000 } }, province: '广东' }, c)
+      finiteWalk(r, '删 pv.degradationPerYear')
+    } catch (e) {
+      fail('⑧ NaN 泄漏扫描', `删 pv.degradationPerYear 抛错：${e.message}`)
     }
   }
   const c = cfg0()
@@ -318,14 +347,14 @@ const allCards = []
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// 疑点钉现状（2026-09-18 审计发现，均「只记录不擅改」——修复需先定口径改 CLAUDE.md，
-// 改后本节断言会红，红=行为已变，需同步此节：这就是钉住的意义）
+// 疑点段（2026-09-18 审计发现）。①②③ 已随口径轮（同日）修复——本节转为守护断言；
+// ④⑤⑥ 仍「只记录不擅改」，修复需先定口径改 CLAUDE.md，改后对应断言会红，红=行为已变
 // ══════════════════════════════════════════════════════════════════════════
-console.log('\n── 疑点现状（钉住，供口径轮对照）──')
+console.log('\n── 疑点现状（①②③已修守护 / ④⑤⑥钉住供口径轮对照）──')
 {
-  // ① 合计回收期与合计 IRR 不同现金流口径：IRR 按寿命截断（储能 10 年后归零），
-  //   回收期 = 投资 ÷ Σ全寿命年净收益（短寿命系统到期后仍在分母贡献）→ 回收期偏乐观。
-  //   界面可达：光伏+储能组合即触发。同卡两指标口径不一致
+  // ① 口径轮修复后：回收期 = 合并逐年现金流（含衰减）累计穿越投资额，与 IRR 同流同口径。
+  //   旧口径「投资 ÷ 全寿命年净」已废弃——储能 10 年到期后不再在分母虚贡献，回收期如实
+  //   变长（685 万组合 3.560 → 3.615 年）。全网格镜像守护见上方网格循环
   const c = cfg0()
   const r = calculateFeasibility(
     { systems: { pv: { enabled: true, capacity: 2000 }, storage: { enabled: true, capacity: 1000 } }, province: '广东' },
@@ -333,15 +362,17 @@ console.log('\n── 疑点现状（钉住，供口径轮对照）──')
   )
   const horizon = Math.max(...r.items.map((it) => it.years))
   console.log(
-    `① 光伏+储能：horizon ${horizon} 年，回收期 ${r.total.paybackPeriod.toFixed(3)} = 投资/全寿命净收益（IRR 却按截断流算出 ${(r.total.irr * 100).toFixed(1)}%）`,
+    `① 光伏+储能：horizon ${horizon} 年，回收期 ${r.total.paybackPeriod.toFixed(3)}（合并流累计穿越）= 与 IRR ${(r.total.irr * 100).toFixed(1)}% 同现金流`,
   )
-  if (r.total.paybackPeriod !== r.total.totalInvestment / r.total.annualNet) {
-    fail('疑点① 合计回收期口径（钉现状）', '合计回收期恒等式破坏（口径已被改动）')
+  if (r.total.paybackPeriod !== crossingOf(r.total.totalInvestment, r.total.mergedFlows)) {
+    fail('疑点① 回收期=合并流累计穿越（口径轮已修·守护）', '合计回收期与合并流穿越镜像不一致（口径被改动）')
   }
 }
 {
-  // ② 合计 IRR 为正、却报「敏感性不适用」：buildSensitivity 以 payback==='N/A' 短路，
-  //   而 IRR 走合并现金流（后段正流拉正）。复现需调低充电桩日均（专家面板可达）
+  // ② 口径轮后原矛盾结构性消失（IRR>0 ⟺ 回收有解，全网格同态律见上）。本场景原是矛盾
+  //    复现点（pv1500+充电200桩·日均 17.9：IRR +0.15% 却 N/A）——衰减口径下未折现总流量
+  //    跌破投资额，IRR 转负，与 N/A 同态一致。sensitivity 的 N/A 短路 gate 留待后续轮次
+  //    改挂 IRR（届时语义等价，此处仅同步标签）
   const c = cfg0()
   c.charger.dailyKwhPerPile = 17.9
   const r = calculateFeasibility(
@@ -352,21 +383,22 @@ console.log('\n── 疑点现状（钉住，供口径轮对照）──')
     { systems: { pv: { enabled: true, capacity: 1500 }, charger: { enabled: true, capacity: 200 } }, province: '广东' },
     c,
   )
-  console.log(`② pv1500+充电200桩（日均 17.9）：年净 ${r.total.annualNet.toFixed(2)} 万 / 回收期 ${r.total.paybackPeriod} / IRR ${(r.total.irr * 100).toFixed(3)}%`)
-  if (!(r.total.annualNet < 0 && r.total.paybackPeriod === 'N/A' && r.total.irr > 0 && sens.applicable === false)) {
-    fail('疑点② IRR 为正却敏感性不适用（钉现状）', '该三态组合行为已变（或不可复现），请核短路条件')
+  console.log(`② pv1500+充电200桩（日均 17.9）：年净 ${r.total.annualNet.toFixed(2)} 万 / 回收期 ${r.total.paybackPeriod} / IRR ${(r.total.irr * 100).toFixed(3)}%（三态一致，原矛盾消失）`)
+  if (!(r.total.annualNet < 0 && r.total.paybackPeriod === 'N/A' && r.total.irr <= 0 && sens.applicable === false)) {
+    fail('疑点② IRR>0 ⟺ 回收期有解（口径轮已修·同态律）', '该场景三态一致性破坏，请核')
   }
 }
 {
-  // ③ IRR 可为负：供冷造价 ×2 ⇒ IRR −2% 而回收期仍是数值 25（"永远收不回"实际有三种
-  //    状态：正 IRR / 负 IRR / N/A，sensitivity.js「IRR 恒报 0」的注释前提不成立）
+  // ③ 口径轮修复后：负 IRR 与「计算期内永不回收」同态——供冷造价×2 时 IRR −2.04% 且
+  //    回收期如实报 N/A（旧口径报数值 25，"永远收不回"却显示 25 年）。负 IRR 的
+  //    展示层语义（界面如何呈现负值）属后续轮次，本处只钉引擎层同态
   const c = cfg0()
   c.cooling.capexPerSqm = 600
   const r = calculateFeasibility({ systems: { cooling: { enabled: true, capacity: 1 } }, province: '广东' }, c)
   const it = r.items[0]
-  console.log(`③ 供冷造价×2：IRR ${(it.irr * 100).toFixed(2)}% / 回收期 ${it.paybackPeriod}（数值，非 N/A）`)
-  if (!(it.irr < 0 && it.paybackPeriod === 25)) {
-    fail('疑点③ IRR 可为负 + 回收期数值（钉现状）', '负 IRR 态行为已变，请核')
+  console.log(`③ 供冷造价×2：IRR ${(it.irr * 100).toFixed(2)}% / 回收期 ${it.paybackPeriod}（负 IRR 与 N/A 同态）`)
+  if (!(it.irr < 0 && it.paybackPeriod === 'N/A')) {
+    fail('疑点③ 负 IRR ⇒ 回收 N/A（口径轮已修·守护）', '负 IRR 态行为已变，请核')
   }
 }
 {
@@ -419,4 +451,4 @@ for (const id of CHECK_IDS) {
   }
 }
 process.exitCode = red > 0 ? 1 : 0
-console.log(red === 0 ? '\n审计通过：不变量与钉住项均符合现状（疑点见上方现状描述，修复属口径轮）' : `\n审计 ${red} 类异常`)
+console.log(red === 0 ? '\n审计通过：不变量与守护项均符合现状（疑点①②③已随口径轮修复，④⑤⑥见上方现状描述）' : `\n审计 ${red} 类异常`)

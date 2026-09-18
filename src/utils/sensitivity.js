@@ -100,7 +100,8 @@ export const buildSensitivity = ({ systems, province, demand }, config) => {
   const base = solve(systems, province, demand, config)
   if (!base) return null
 
-  // 组合年净现金流非正（回收期 N/A）时 IRR 恒报 0 口径失真，敏感性不适用
+  // 回收期 N/A（口径轮后 = 合并现金流在计算期内累计收不回投资，IRR ≤ 0 与之同态）时
+  // 敏感性不适用——年净首年为正也可能落入此态（长周期衰减 + 短寿命负流分项拖累累计）
   if (base.paybackPeriod === 'N/A') {
     return {
       applicable: false,
@@ -108,7 +109,7 @@ export const buildSensitivity = ({ systems, province, demand }, config) => {
       rows: [],
       flat: [],
       hurdle: config.general.discountRate,
-      summaryLines: ['组合年净现金流非正（静态回收期 N/A），敏感性分析不适用'],
+      summaryLines: ['组合现金流在计算期内收不回投资（静态回收期 N/A），敏感性分析不适用'],
     }
   }
 

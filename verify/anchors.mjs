@@ -59,7 +59,7 @@ const fnv1a = (s) => {
 }
 const structureNow = () =>
   [...leafPaths(defaultConfig), ...leafPaths(R).map((p) => `rules.${p}`)].sort()
-const FINGERPRINT = { count: 280, hash: '51194553' } // 2026-09-18 基线（31 省 × 4 字段 + 四系统 + 参考表 + 规则）
+const FINGERPRINT = { count: 282, hash: '467dc68c' } // 2026-09-18 口径轮基线（31 省 × 4 字段 + 四系统 + 参考表 + 规则 + pv/storage 衰减系数）
 {
   const now = structureNow()
   const ok = now.length === FINGERPRINT.count && fnv1a(now.join('\n')) === FINGERPRINT.hash
@@ -73,9 +73,11 @@ const FINGERPRINT = { count: 280, hash: '51194553' } // 2026-09-18 基线（31 �
 // 任何一条不符 = 默认值已改，按提示同步本文件钉值与对应锚点算式
 const ROOT = { ...defaultConfig, benchmarks: { ...defaultBenchmarks }, rules: R }
 const PINS = [
-  ['pv.capexPerWatt', 3.0], ['pv.performanceRatio', 0.9], ['pv.omRatioPerYear', 0.01], ['pv.lifetimeYears', 25],
+  ['pv.capexPerWatt', 3.0], ['pv.performanceRatio', 0.9], ['pv.degradationPerYear', 0.0055],
+  ['pv.omRatioPerYear', 0.01], ['pv.lifetimeYears', 25],
   ['storage.capexPerKWh', 850], ['storage.cycle2SpreadRatio', 0.5], ['storage.roundTripEfficiency', 0.88],
   ['storage.depthOfDischarge', 0.9], ['storage.availableDaysPerYear', 330], ['storage.chargePricePerKwh', 0.3],
+  ['storage.degradationPerYear', 0.025],
   ['storage.demandShaveRatio', 0.1], ['storage.demandPricePerKwMonth', 30],
   ['storage.omRatioPerYear', 0.02], ['storage.lifetimeYears', 10],
   ['storageSizing.hours', 2], ['storageSizing.transformerPowerRatio', 0.25], ['storageSizing.peakShiftRatio', 0.35],
@@ -109,14 +111,16 @@ const PINS = [
 // A1 闭式解 IRR（强）—— pv.lifetimeYears 可覆盖，造代数精确解
 // ══════════════════════════════════════════════════════════════════════════
 // 场景：广东 2000 kW 光伏。投资 = 2000×1000×3.0/1e4 = 600 万；
-// 年净 = (2000×1050×0.9×0.75)/1e4 − 600×1% = 141.75 − 6 = 135.75 万
+// 年净 = (2000×1050×0.9×0.75)/1e4 − 600×1% = 141.75 − 6 = 135.75 万。
+// 衰减显式置 0：闭式解要求等额年金（2026-09 口径轮起默认带线性衰减，年金无闭式解；
+// 衰减路径本身的正确性由 A3 手推 + numeric-audit 穿越镜像 + case-replay C4 外证覆盖）
 const C = buildConfig()
 const pvCapex = (2000 * 1000 * 3.0) / 1e4
 const pvNet = (2000 * 1050 * 0.9 * 0.75) / 1e4 - pvCapex * 0.01
 const irrWithLifetime = (years) =>
   calculateFeasibility(
     { systems: { pv: { enabled: true, capacity: 2000 } }, province: '广东' },
-    { ...C, pv: { ...C.pv, lifetimeYears: years } },
+    { ...C, pv: { ...C.pv, lifetimeYears: years, degradationPerYear: 0 } },
   ).items[0].irr
 // 容差 |Δ|≤1e-4（绝对）：二分迭代自身容差 hi−lo≤1e-4，残差天然在 e-5 量级——
 // 压测实测三例误差 1.25e-5 / 2.59e-5 / 5.8e-6；写 1e-6 形 100% 误报
@@ -191,11 +195,22 @@ const one = (type, capacity, demand) =>
   const capex = (2000 * 1000 * 3.0) / 1e4
   const gross = (2000 * 1050 * 0.9 * 0.75) / 1e4
   const net = gross - capex * 0.01
+  // 回收期（累计穿越，口径轮）：年流 = 135.75 − 0.779625·t（0.55%/年线性衰减），
+  // 前 4 年累计 538.32225 < 600 ≤ 第 5 年末累计 → 4 + 61.67775/132.6315 = 4.46506
+  const flow = (t) => gross * (1 - 0.0055 * t) - capex * 0.01
+  const cum4 = flow(0) + flow(1) + flow(2) + flow(3)
+  const payback = 4 + (capex - cum4) / flow(4)
   check(
-    'A3 光伏 2000 kW：投资 600 / 毛收益 141.75 / 净 135.75 / 回收 4.42 / 碳 1002.834',
+    'A3 光伏 2000 kW：投资 600 / 毛收益 141.75 / 净 135.75 / 回收（穿越）4.4651 / 碳 1002.834',
     near(r.totalInvestment, capex) && near(r.annualRevenue, gross) && near(r.annualNet, net) &&
-      near(r.paybackPeriod, capex / net) && near(r.carbonReduction, ((2000 * 1050 * 0.9) / 1000) * 0.5306),
+      near(r.paybackPeriod, payback) && near(r.carbonReduction, ((2000 * 1050 * 0.9) / 1000) * 0.5306),
     `实测 ${r.totalInvestment} / ${r.annualRevenue} / ${r.annualNet} / ${r.paybackPeriod.toFixed(4)} / ${r.carbonReduction}`,
+  )
+  // 衰减现金流 IRR 无闭式解——与 README m1 基线 1 位小数互证（独立手算路径：衰减年金二分）
+  check(
+    'A3 光伏 · README m1 互证：IRR 21.9%（衰减口径）',
+    (r.irr * 100).toFixed(1) === '21.9',
+    `实测 ${(r.irr * 100).toFixed(2)}%`,
   )
 }
 {
@@ -212,11 +227,11 @@ const one = (type, capacity, demand) =>
       near(r.carbonReduction, (discharge / 1000) * 0.5306),
     `实测 ${r.totalInvestment} / ${r.annualRevenue} / ${r.annualNet} / ${r.carbonReduction}`,
   )
-  // verify/README m1 已有人工核对基线（IRR 66.4% / 回收 1.5 年，2026-09 capex 换版后）——
+  // verify/README m1 已有人工核对基线（IRR 63.7% / 回收 1.5 年，2026-09 口径轮衰减后）——
   // 保留 1 位小数互证，这是锚点文件里唯一「文档基线」来源的一行，系数换版时与 m1 同步
   check(
-    'A3 储能 · README m1 互证：IRR 66.4% / 回收 1.5 年',
-    (r.irr * 100).toFixed(1) === '66.4' && r.paybackPeriod.toFixed(1) === '1.5',
+    'A3 储能 · README m1 互证：IRR 63.7% / 回收 1.5 年',
+    (r.irr * 100).toFixed(1) === '63.7' && r.paybackPeriod.toFixed(1) === '1.5',
     `实测 ${(r.irr * 100).toFixed(2)}% / ${r.paybackPeriod.toFixed(3)}`,
   )
 }
@@ -262,9 +277,9 @@ const one = (type, capacity, demand) =>
   const stDischarge = 1000 * 0.9 * 330 * (1 + 0.5)
   const stCarbon = (stDischarge / 1000) * 0.5306
   check(
-    'A3 合计（光伏 2000 + 储能 1000）· README m1 互证：投资 === 685 / IRR 27.3% / 回收 3.6 年',
+    'A3 合计（光伏 2000 + 储能 1000）· README m1 互证：投资 === 685 / IRR 26.3% / 回收 3.6 年',
     combo.total.totalInvestment === 685 &&
-      (combo.total.irr * 100).toFixed(1) === '27.3' &&
+      (combo.total.irr * 100).toFixed(1) === '26.3' &&
       combo.total.paybackPeriod.toFixed(1) === '3.6' &&
       near(combo.total.carbonReduction, pvCarbon + stCarbon),
     `实测 ${combo.total.totalInvestment} / ${(combo.total.irr * 100).toFixed(2)}% / ${combo.total.paybackPeriod.toFixed(3)} / ${combo.total.carbonReduction.toFixed(4)}`,

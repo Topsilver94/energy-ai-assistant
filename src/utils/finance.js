@@ -2,14 +2,20 @@
  * 模块② 财务计算核心（组合测算版）—— 纯函数、无副作用、可单测（CLAUDE.md §5）。
  * 所有系数一律从入参 config 读取，本文件严禁出现任何业务数字（红线）。
  *
- * 统一口径：
+ * 统一口径（2026-09 口径轮起）：
  *   - 金额：万元；电量：kWh；排放因子：tCO₂/MWh（生态环境部口径）
- *   - 年净现金流 = 年毛收益 − 年运维；初始投资计 t0
- *   - IRR：NPV = 0 二分迭代，精度 0.01%（1e-4），不引入第三方财务库
- *   - 静态回收期 = 投资 / 年净现金流；净现金流 ≤ 0 时返回 'N/A'
- *   - 碳减排 = 年发电/节电量(kWh) ÷ 1000(→MWh) × 电网排放因子
- *   - 组合总账：投资/毛收益/碳减排分项相加；IRR 与回收期基于**合并现金流**——
- *     共同计算期取各系统寿命最大值，各系统现金流寿命到期后归零（不做再投资假设）
+ *   - 年净现金流（首年）= 年毛收益 − 年运维；初始投资计 t0。
+ *     年毛收益自第二年起按线性衰减递减（首年全额，运维恒定）——光伏组件线性质保
+ *     ~0.55%/年、储能 LFP SOH 质保 ~2.5%/年（专家可调，见 coefficients.js）；
+ *     供冷/充电桩不计衰减（无公开质保口径可溯，充电桩利用率方向相反）。
+ *     依据：verify/case-replay.md C4 案例归因，无衰减口径较第三方研报基准偏乐观约 5pp
+ *   - IRR：NPV = 0 二分迭代，精度 0.01%（1e-4），不引入第三方财务库；基于逐年（含衰减）现金流
+ *   - 静态回收期 = 逐年现金流累计首次穿越投资额的年份（年内线性内插；计算期内永不穿越
+ *     返回 'N/A'）。恒定现金流（衰减 0）时逐位退化为「投资 ÷ 年净」——兼容旧口径
+ *   - 碳减排 = 年发电/节电量(kWh，首年口径) ÷ 1000(→MWh) × 电网排放因子
+ *   - 组合总账：投资/毛收益/碳减排分项相加；IRR 与回收期同用**合并逐年现金流**——
+ *     共同计算期取各系统寿命最大值，各系统现金流寿命到期后归零（不做再投资假设）。
+ *     回收期与 IRR 同现金流同口径（旧口径回收期 = 投资/全寿命年净，同卡两指标口径不一致，已废弃）
  */
 
 // 需量计费政策门槛（全国统一规则，发改价格〔2026〕1077 号第四监管周期体系，2026-08 起）：
@@ -28,8 +34,28 @@ const npvOf = (investment, flows, rate) => {
   return total
 }
 
-/** 等额年金展开为逐年现金流数组（单个系统的简单场景） */
-const annuityFlows = (annualNet, years) => Array.from({ length: years }, () => annualNet)
+/**
+ * 逐年现金流（2026-09 口径轮）：首年全额，年毛收益自第二年起按线性衰减递减（deg=0 退化为
+ * 等额年金，与旧口径逐位一致）；运维与固定成本恒定（按投资比例，不随产能衰减）
+ */
+const cashFlows = (gross, om, fixedOm, years, degradation) =>
+  Array.from({ length: years }, (_, t) => gross * (1 - degradation * t) - om - fixedOm)
+
+/**
+ * 静态回收期（2026-09 口径轮）：逐年现金流累计首次穿越投资额的年份，年内线性内插；
+ * 计算期内永不穿越返回 'N/A'（负 IRR 的组合与「永远收不回」自此同态，不再出现
+ * IRR 为负而回收期显示数值的矛盾）。恒定现金流时逐位退化为「投资 ÷ 年净」
+ */
+const paybackOf = (investment, flows) => {
+  let cum = 0
+  for (let t = 0; t < flows.length; t += 1) {
+    const prev = cum
+    cum += flows[t]
+    // 首次穿越只可能发生在正流量年份（此前累计 < 投资，仅正流量能推过线）
+    if (cum >= investment && flows[t] > 0) return t + (investment - prev) / flows[t]
+  }
+  return 'N/A'
+}
 
 /**
  * IRR 二分迭代：现金流总收益 > 0 时 NPV 随利率单调递减，区间 [-0.9, hi] 收敛。
@@ -73,6 +99,7 @@ const perType = (projectType, scale, province, config, demand) => {
       energyKwh: genKwh,
       omRatio: pv.omRatioPerYear,
       years: pv.lifetimeYears,
+      degradation: pv.degradationPerYear ?? 0, // 线性质保口径年衰减（首年全额）
     }
   }
 
@@ -133,6 +160,7 @@ const perType = (projectType, scale, province, config, demand) => {
       energyKwh: dischargeKwh,
       omRatio: storage.omRatioPerYear,
       years: storage.lifetimeYears,
+      degradation: storage.degradationPerYear ?? 0, // SOH 质保口径年衰减（作用于放电量与套利收益）
       demandDetail,
     }
   }
@@ -155,6 +183,7 @@ const perType = (projectType, scale, province, config, demand) => {
       energyKwh: savingKwh,
       omRatio: cooling.omRatioPerYear,
       years: cooling.lifetimeYears,
+      degradation: 0, // 无公开质保口径可溯，不计衰减（口径边界见文件头）
     }
   }
 
@@ -174,6 +203,7 @@ const perType = (projectType, scale, province, config, demand) => {
       fixedOm: (scale * charger.siteCostPerPile) / 1e4,
       omRatio: charger.omRatioPerYear,
       years: charger.lifetimeYears,
+      degradation: 0, // 充电桩利用率随电动车渗透率上行，方向与衰减相反，不计
     }
   }
 
@@ -188,8 +218,10 @@ const perType = (projectType, scale, province, config, demand) => {
  *   报告侧如实注明，不静默硬造）；仅储能消费该参数
  * @param {object} config configStore 的纯数值配置
  * @returns {{ province, demand, items: Array, total: object } | null}
- *   items：各选中系统的分项结果（储能含 demandDetail：已计入的削峰口径，或 skipped 原因）；
- *   total：组合总账（金额万元 / IRR 小数 / 回收期年（净现金流≤0 时 'N/A'）/ 碳减排 tCO₂·a⁻¹）。
+ *   items：各选中系统的分项结果（含 flows 逐年现金流数组；储能含 demandDetail：已计入的削峰
+ *   口径，或 skipped 原因）；annualRevenue / annualNet 为首年口径（代表年）。
+ *   total：组合总账（金额万元 / IRR 小数 / 回收期年（累计穿越口径，计算期内不穿越为 'N/A'）/
+ *   碳减排 tCO₂·a⁻¹ / mergedFlows 合并逐年现金流）。
  *   demand 原样回显——敏感性重建入参与分项表严格同源。无可测算项时返回 null。
  * @throws 入参形状不符时直接抛错（fail-fast，不做静默兜底）
  */
@@ -210,7 +242,8 @@ export const calculateFeasibility = ({ systems, province, demand }, config) => {
 
     const om = typed.capex * typed.omRatio // 年运维（万元，按投资比例）
     const fixedOm = typed.fixedOm ?? 0 // 固定年成本（万元，如场地租金，可选）
-    const net = typed.gross - om - fixedOm // 年净现金流（万元）
+    const net = typed.gross - om - fixedOm // 年净现金流（首年，万元；展示与报告的代表年口径）
+    const flows = cashFlows(typed.gross, om, fixedOm, typed.years, typed.degradation ?? 0)
 
     return {
       type,
@@ -218,8 +251,9 @@ export const calculateFeasibility = ({ systems, province, demand }, config) => {
       totalInvestment: typed.capex,
       annualRevenue: typed.gross,
       annualNet: net,
-      irr: calcIrr(typed.capex, annuityFlows(net, typed.years)),
-      paybackPeriod: net > 0 ? typed.capex / net : 'N/A',
+      flows, // 逐年现金流（IRR 与回收期同源；verify 审计与敏感性复算直接消费）
+      irr: calcIrr(typed.capex, flows),
+      paybackPeriod: paybackOf(typed.capex, flows),
       carbonReduction: (typed.energyKwh / 1000) * config.general.gridEmissionFactor,
       years: typed.years,
       ...(typed.demandDetail ? { demandDetail: typed.demandDetail } : {}),
@@ -231,11 +265,12 @@ export const calculateFeasibility = ({ systems, province, demand }, config) => {
   const annualRevenue = sum((it) => it.annualRevenue)
   const annualNet = sum((it) => it.annualNet)
 
-  // 组合合并现金流：共同计算期 = 各系统寿命最大值，寿命到期后该系统现金流归零
+  // 组合合并现金流：共同计算期 = 各系统寿命最大值，寿命到期后该系统现金流归零。
+  // 2026-09 口径轮：直接累加分项 flows——IRR 与回收期同一套逐年（含衰减）现金流，同卡口径一致
   const horizon = Math.max(...items.map((it) => it.years))
   const mergedFlows = Array.from(
     { length: horizon },
-    (_, t) => items.reduce((acc, it) => (t < it.years ? acc + it.annualNet : acc), 0),
+    (_, t) => items.reduce((acc, it) => (t < it.years ? acc + it.flows[t] : acc), 0),
   )
 
   return {
@@ -246,8 +281,9 @@ export const calculateFeasibility = ({ systems, province, demand }, config) => {
       totalInvestment,
       annualRevenue,
       annualNet,
+      mergedFlows, // 合并逐年现金流（verify 审计消费）
       irr: calcIrr(totalInvestment, mergedFlows),
-      paybackPeriod: annualNet > 0 ? totalInvestment / annualNet : 'N/A',
+      paybackPeriod: paybackOf(totalInvestment, mergedFlows),
       carbonReduction: sum((it) => it.carbonReduction),
     },
   }
